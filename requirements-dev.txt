@@ -1,0 +1,10 @@
+flask-debugtoolbar
+flask-testing
+sphinx
+sphinxcontrib-httpdomain
+pytest
+pytest-cov
+factory-boy
+fake-factory
+ipython
+ipdb
