@@ -1,10 +1,8 @@
 from flask.ext import restful
 from flask.ext.restful import fields, marshal_with
-from flask.ext.cache import Cache
 from atlas_core.models import Cat
 
 api = restful.Api()
-cache = Cache()
 
 cat_fields = {
     'id': fields.String,
@@ -15,7 +13,6 @@ cat_fields = {
 
 class CatAPI(restful.Resource):
 
-    @cache.cached(timeout=60)
     @marshal_with(cat_fields)
     def get(self, cat_id):
         """Get a :py:class:`~atlas_core.models.Cat` with the given cat ID.

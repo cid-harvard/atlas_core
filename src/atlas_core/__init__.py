@@ -3,7 +3,7 @@ from flask import Flask
 from werkzeug.contrib.profiler import ProfilerMiddleware
 
 from atlas_core.views import CatAPI
-from atlas_core.views import api, cache
+from atlas_core.views import api
 from atlas_core.models import db
 
 
@@ -17,7 +17,6 @@ def create_app(config={}):
 
     #External
     api.init_app(app)
-    cache.init_app(app)
 
     #Internal
     db.init_app(app)
