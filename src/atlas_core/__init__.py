@@ -1,6 +1,5 @@
 from flask import Flask
 
-from raven.contrib.flask import Sentry
 from werkzeug.contrib.profiler import ProfilerMiddleware
 
 from atlas_core.views import CatAPI
@@ -17,7 +16,6 @@ def create_app(config={}):
     api.add_resource(CatAPI, "/cats/<int:cat_id>")
 
     #External
-    sentry.init_app(app)
     api.init_app(app)
     cache.init_app(app)
 
@@ -36,4 +34,3 @@ def create_app(config={}):
 
     return app
 
-sentry = Sentry()
