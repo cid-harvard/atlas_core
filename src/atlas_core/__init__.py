@@ -1,7 +1,6 @@
 from flask import Flask
 
 from raven.contrib.flask import Sentry
-from flask_debugtoolbar import DebugToolbarExtension
 from werkzeug.contrib.profiler import ProfilerMiddleware
 
 from atlas_core.views import CatAPI
@@ -30,7 +29,6 @@ def create_app(config={}):
 
     #Debug tools
     if app.debug:
-        DebugToolbarExtension(app)
         if app.config.get("PROFILE", False):
             app.wsgi_app = ProfilerMiddleware(app.wsgi_app,
                                               restrictions=[30],
