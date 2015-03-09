@@ -23,7 +23,7 @@ def dummy(n=10):
     for x in range(0, int(n)):
         m = factories.Cat()
         ids.append(m.id)
-    models.db.session.commit()
+    db.session.commit()
 
     print("Inserted these ids:")
     for x in ids:

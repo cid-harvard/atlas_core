@@ -32,7 +32,7 @@ shell: virtualenv
 	. $(ACTIVATE); FLASK_CONFIG="../conf/dev.py" $(PYTHON_EXECUTABLE) manage.py shell
 
 dummy: virtualenv
-	. $(ACTIVATE); FLASK_CONFIG="../../conf/dev.py" $(PYTHON_EXECUTABLE) atlas_core/manage.py dummy -n $(count)
+	. $(ACTIVATE); FLASK_CONFIG="../conf/dev.py" $(PYTHON_EXECUTABLE) manage.py dummy -n $(count)
 
 docs: virtualenv
 	git submodule add git://github.com/kennethreitz/kr-sphinx-themes.git doc/_themes
