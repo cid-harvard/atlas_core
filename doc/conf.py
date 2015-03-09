@@ -4,13 +4,14 @@
 #
 # This file is execfile()d with the current directory set to its containing dir.
 
-import sys, os
+import sys
+import os
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-sys.path.insert(0, os.path.abspath('../src/'))
-os.environ["FLASK_CONFIG"]="../../conf/dev.py"
+sys.path.insert(0, os.path.abspath('../'))
+os.environ["FLASK_CONFIG"] = "../conf/dev.py"
 
 # -- General configuration -----------------------------------------------------
 

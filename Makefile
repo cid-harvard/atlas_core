@@ -35,7 +35,7 @@ dummy: virtualenv
 	. $(ACTIVATE); FLASK_CONFIG="../conf/dev.py" $(PYTHON_EXECUTABLE) manage.py dummy -n $(count)
 
 docs: virtualenv
-	git submodule add git://github.com/kennethreitz/kr-sphinx-themes.git doc/_themes
+	git submodule update --init
 	. $(ACTIVATE); make -C doc/ html
 	open doc/_build/html/index.html
 
