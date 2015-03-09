@@ -1,9 +1,7 @@
-from flask.ext.sqlalchemy import SQLAlchemy
-
 import time
 import random
 
-db = SQLAlchemy()
+from ..core import db
 
 
 def new_cat_name(prefix="mittens"):
