@@ -10,7 +10,7 @@ class ChassisTestCase(TestCase):
     asserts."""
 
     def create_app(self):
-        return create_app()
+        return create_app(config={"TESTING": True})
 
     def setUp(self):
         db.create_all()
