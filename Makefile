@@ -23,16 +23,16 @@ $(ACTIVATE): $(requirements)
 	touch $(ACTIVATE)
 
 dev: virtualenv
-	. $(ACTIVATE); FLASK_CONFIG="../../conf/dev.py" $(PYTHON_EXECUTABLE) src/runserver.py
+	. $(ACTIVATE); FLASK_CONFIG="../../conf/dev.py" $(PYTHON_EXECUTABLE) atlas_core/runserver.py
 
 test: virtualenv
-	. $(ACTIVATE); FLASK_CONFIG="../../conf/dev.py" py.test --cov atlas_core src/tests.py
+	. $(ACTIVATE); FLASK_CONFIG="../../conf/dev.py" py.test --cov atlas_core atlas_core/tests.py
 
 shell: virtualenv
-	. $(ACTIVATE); FLASK_CONFIG="../../conf/dev.py" $(PYTHON_EXECUTABLE) src/manage.py shell
+	. $(ACTIVATE); FLASK_CONFIG="../../conf/dev.py" $(PYTHON_EXECUTABLE) atlas_core/manage.py shell
 
 dummy: virtualenv
-	. $(ACTIVATE); FLASK_CONFIG="../../conf/dev.py" $(PYTHON_EXECUTABLE) src/manage.py dummy -n $(count)
+	. $(ACTIVATE); FLASK_CONFIG="../../conf/dev.py" $(PYTHON_EXECUTABLE) atlas_core/manage.py dummy -n $(count)
 
 docs: virtualenv
 	git submodule add git://github.com/kennethreitz/kr-sphinx-themes.git doc/_themes
