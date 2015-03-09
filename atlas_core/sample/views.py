@@ -1,8 +1,9 @@
 from flask import Blueprint, jsonify
 import marshmallow as m
-from atlas_core.models import Cat
 
-main_app = Blueprint("main_app", __name__)
+from .models import Cat
+
+sample_app = Blueprint("sample_app", __name__)
 
 
 class CatSchema(m.Schema):
@@ -13,7 +14,7 @@ class CatSchema(m.Schema):
 cat_schema = CatSchema()
 
 
-@main_app.route("/cats/<int:cat_id>")
+@sample_app.route("/cats/<int:cat_id>")
 def cat(cat_id):
     """Get a :py:class:`~atlas_core.models.Cat` with the given cat ID.
 
@@ -24,4 +25,3 @@ def cat(cat_id):
     """
     q = Cat.query.get_or_404(cat_id)
     return jsonify(cat_schema.dump(q).data)
-
