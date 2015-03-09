@@ -2,19 +2,12 @@ import time
 import random
 
 from ..core import db
+from ..sqlalchemy import BaseModel
 
 
 def new_cat_name(prefix="mittens"):
     """Returns a random cat name."""
     return "%s%d" % (prefix, random.randint(0, 9999))
-
-
-class BaseModel(db.Model):
-    __abstract__ = True
-    __table_args__ = {
-        'mysql_engine': 'InnoDB',
-        'mysql_charset': 'utf8'
-    }
 
 
 class Cat(BaseModel):
