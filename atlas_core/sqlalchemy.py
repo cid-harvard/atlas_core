@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Query, Model
-from flask import abort
+from .helpers.flask import abort
 
 
 class BaseQuery(Query):
@@ -31,7 +31,7 @@ class BaseQuery(Query):
         if value not in possible_values:
             msg = "Expected one of: {0}, got {1}"\
                 .format(possible_values, value)
-            abort(http_code, message=msg)
+            abort(http_code, body=msg)
 
         return self.filter(enum == value)
 
