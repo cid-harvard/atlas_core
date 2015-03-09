@@ -2,9 +2,8 @@ from flask import Flask
 
 from werkzeug.contrib.profiler import ProfilerMiddleware
 
-from core import db
-
-from sample_app.views import sample_app
+from .core import db
+from .sample.views import sample_app
 
 
 def create_app(config={}):
