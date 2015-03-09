@@ -2,8 +2,7 @@ from flask import Flask
 
 from werkzeug.contrib.profiler import ProfilerMiddleware
 
-from atlas_core.views import CatAPI
-from atlas_core.views import api
+from atlas_core.views import main_app
 from atlas_core.models import db
 
 
@@ -12,11 +11,7 @@ def create_app(config={}):
     app.config.from_envvar("FLASK_CONFIG")
     app.config.update(config)
 
-    #API Endpoints
-    api.add_resource(CatAPI, "/cats/<int:cat_id>")
-
-    #External
-    api.init_app(app)
+    app.register_blueprint(main_app)
 
     #Internal
     db.init_app(app)

@@ -1,8 +1,9 @@
 from flask.ext import restful
 from flask.ext.restful import fields, marshal_with
+from flask import Blueprint, jsonify
 from atlas_core.models import Cat
 
-api = restful.Api()
+main_app = Blueprint("main_app", __name__)
 
 cat_fields = {
     'id': fields.String,
