@@ -1,7 +1,6 @@
-from atlas_core import create_app, models
-import factories
+from atlas_core import create_app, models, factories
+from atlas_core.core import db
 from flask.ext.script import Manager, Shell
-
 
 
 app = create_app()
@@ -9,7 +8,7 @@ manager = Manager(app)
 
 
 def _make_context():
-        return dict(app=app, db=models.db, models=models, factories=factories)
+        return dict(app=app, db=db, models=models, factories=factories)
 
 manager.add_command("shell", Shell(make_context=_make_context))
 

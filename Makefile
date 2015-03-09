@@ -29,7 +29,7 @@ test: virtualenv
 	. $(ACTIVATE); FLASK_CONFIG="../conf/dev.py" py.test --cov atlas_core atlas_core/tests.py
 
 shell: virtualenv
-	. $(ACTIVATE); FLASK_CONFIG="../../conf/dev.py" $(PYTHON_EXECUTABLE) atlas_core/manage.py shell
+	. $(ACTIVATE); FLASK_CONFIG="../conf/dev.py" $(PYTHON_EXECUTABLE) manage.py shell
 
 dummy: virtualenv
 	. $(ACTIVATE); FLASK_CONFIG="../../conf/dev.py" $(PYTHON_EXECUTABLE) atlas_core/manage.py dummy -n $(count)
