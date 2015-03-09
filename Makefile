@@ -23,7 +23,7 @@ $(ACTIVATE): $(requirements)
 	touch $(ACTIVATE)
 
 dev: virtualenv
-	. $(ACTIVATE); FLASK_CONFIG="../../conf/dev.py" $(PYTHON_EXECUTABLE) atlas_core/runserver.py
+	. $(ACTIVATE); FLASK_CONFIG="../conf/dev.py" $(PYTHON_EXECUTABLE) runserver.py
 
 test: virtualenv
 	. $(ACTIVATE); FLASK_CONFIG="../../conf/dev.py" py.test --cov atlas_core atlas_core/tests.py
