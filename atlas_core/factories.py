@@ -1,9 +1,9 @@
-from atlas_core.models import db
-from atlas_core import models
-
 from faker import Factory as Fake
 from factory.alchemy import SQLAlchemyModelFactory
 import factory
+
+from .core import db
+from . import models
 
 import logging
 

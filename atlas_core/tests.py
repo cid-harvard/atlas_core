@@ -1,8 +1,8 @@
 from flask.ext.testing import TestCase
 
-from atlas_core import create_app
-from atlas_core.models import db
-import factories
+from . import create_app
+from .core import db
+from atlas_core import factories
 
 
 class ChassisTestCase(TestCase):
