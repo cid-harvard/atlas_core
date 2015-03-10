@@ -8,4 +8,4 @@ install:
     - "pip install coveralls pep8"
 script: 'py.test --cov atlas_core --cov-report term-missing atlas_core/tests.py'
 after_success:
-    coveralls
+    coveralls -v
