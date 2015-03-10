@@ -1,5 +1,8 @@
 language: python
 python:
+    - "3.3"
     - "3.4"
+env:
+    - FLASK_CONFIG="../conf/dev.py"
 install: "pip install -r requirements.txt -r requirements-dev.txt"
-script: 'FLASK_CONFIG="../conf/dev.py" py.test --cov atlas_core atlas_core/tests.py'
+script: 'py.test --cov atlas_core atlas_core/tests.py'
