@@ -2,7 +2,7 @@ import flask.ext.sqlalchemy as flask_sa
 from .helpers.flask import abort
 
 
-class BaseQuery(flask_sa.Query):
+class BaseQuery(flask_sa.BaseQuery):
 
     def get_or_abort(self, obj_id, http_code=404):
         """Get an object or return an error code."""
