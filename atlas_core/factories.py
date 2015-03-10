@@ -7,7 +7,7 @@ from . import models
 
 import logging
 
-#Suppress factory-boy debug data
+# Suppress factory-boy debug data
 factory_log = logging.getLogger("factory")
 factory_log.setLevel(logging.WARNING)
 

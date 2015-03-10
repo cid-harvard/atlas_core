@@ -1,8 +1,8 @@
-import flask.ext.sqlalchemy as flask_sa
 from .helpers.flask import abort
+from .core import db
 
 
-class BaseQuery(flask_sa.BaseQuery):
+class BaseQuery(db.Query):
 
     def get_or_abort(self, obj_id, http_code=404):
         """Get an object or return an error code."""
@@ -36,7 +36,7 @@ class BaseQuery(flask_sa.BaseQuery):
         return self.filter(enum == value)
 
 
-class BaseModel(flask_sa.Model):
+class BaseModel(db.Model):
     __abstract__ = True
     __table_args__ = {
         'mysql_engine': 'InnoDB',
