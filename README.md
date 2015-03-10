@@ -5,6 +5,8 @@ Atlas-core is a collection of building blocks for the new atlas projects at
 Harvard CID - it contains things like common models and model mixins, helper
 functions, tools, etc.
 
+![Build Status](https://travis-ci.org/cid-harvard/atlas_core.svg?branch=master)
+
 Development
 -----------
 
