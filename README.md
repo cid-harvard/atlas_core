@@ -6,6 +6,7 @@ Harvard CID - it contains things like common models and model mixins, helper
 functions, tools, etc.
 
 ![Build Status](https://travis-ci.org/cid-harvard/atlas_core.svg?branch=master)
+[![Coverage Status](https://coveralls.io/repos/cid-harvard/atlas_core/badge.svg)](https://coveralls.io/r/cid-harvard/atlas_core)
 
 Development
 -----------
