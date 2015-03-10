@@ -26,10 +26,6 @@ def handle_api_error(error):
 
 
 def abort(status_code, body=None, headers={}):
-    """Abort function that does content negotiation to respond with a JSON
-    error body for ajax requests. From http://flask.pocoo.org/snippets/97/ -
-    public domain, by Jökull Sólberg Auðunsson.
-    """
     raise APIError(status_code, body, headers)
 
 
