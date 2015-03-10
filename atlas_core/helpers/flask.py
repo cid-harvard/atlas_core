@@ -1,8 +1,28 @@
-from werkzeug.exceptions import default_exceptions, HTTPException
-from flask import make_response, abort as flask_abort, request
-from flask.exceptions import JSONHTTPException
+from flask import make_response, jsonify
 
 from functools import wraps
+
+
+class APIError(Exception):
+
+    def __init__(self, status_code, message=None, payload=None, headers=None):
+        Exception.__init__(self)
+        self.status_code = status_code
+        self.message = message
+        self.payload = payload
+        self.headers = headers
+
+    def to_dict(self):
+        rv = dict(self.payload or ())
+        rv['message'] = self.message
+        return rv
+
+
+def handle_api_error(error):
+    response = jsonify(error.to_dict())
+    response.status_code = error.status_code
+    response.headers.update(error.headers)
+    return response
 
 
 def abort(status_code, body=None, headers={}):
@@ -10,22 +30,7 @@ def abort(status_code, body=None, headers={}):
     error body for ajax requests. From http://flask.pocoo.org/snippets/97/ -
     public domain, by Jökull Sólberg Auðunsson.
     """
-
-    if 'text/html' in request.headers.get("Accept", ""):
-        error_cls = HTTPException
-    else:
-        error_cls = JSONHTTPException
-
-    class_name = error_cls.__name__
-    bases = [error_cls]
-    attributes = {'code': status_code}
-
-    if status_code in default_exceptions:
-        # Mixin the Werkzeug exception
-        bases.insert(0, default_exceptions[status_code])
-
-    error_cls = type(class_name, tuple(bases), attributes)
-    flask_abort(make_response(error_cls(body), status_code, headers))
+    raise APIError(status_code, body, headers)
 
 
 def headers(headers={}):
