@@ -11,6 +11,9 @@ env/
 *.egg
 *.egg-info
 
+# Package build dir
+build/
+
 # Installer logs
 pip-log.txt
 
