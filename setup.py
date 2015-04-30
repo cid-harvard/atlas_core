@@ -1,5 +1,5 @@
 import os
-from setuptools import setup
+from setuptools import setup, find_packages
 
 
 def read(fname, lines=False):
@@ -15,7 +15,7 @@ setup(
     author="Mali Akmanalp <Harvard CID>",
     description=("Core building blocks for atlas projects at CID."),
     url="http://github.com/cid-harvard/atlas_core",
-    packages=['atlas_core'],
+    packages=find_packages(exclude=["atlas_core.sample"]),
     install_requires=read("requirements.txt", lines=True),
     long_description=read('README.md'),
     classifiers=[
