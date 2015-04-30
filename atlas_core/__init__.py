@@ -2,7 +2,7 @@ from flask import Flask
 
 from werkzeug.contrib.profiler import ProfilerMiddleware
 
-from .core import db
+from .core import db, babel
 from .sample.views import sample_app
 
 
@@ -15,6 +15,7 @@ def create_app(config={}):
 
     # Internal
     db.init_app(app)
+    babel.init_app(app)
 
     with app.app_context():
         db.create_all()
