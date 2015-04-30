@@ -15,8 +15,10 @@ faker = Fake.create()
 
 
 class Cat(SQLAlchemyModelFactory):
-    FACTORY_FOR = models.Cat
-    FACTORY_SESSION = db.session
+
+    class Meta:
+        model = models.Cat
+        sqlalchemy_session = db.session
 
     id = factory.LazyAttribute(lambda x: faker.unix_time())
     born_at = factory.LazyAttribute(lambda x: faker.unix_time())
