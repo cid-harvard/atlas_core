@@ -5,6 +5,8 @@ from functools import wraps
 
 class APIError(Exception):
 
+    TITLE = "An error occurred while processing your request."
+
     def __init__(self, status_code, message=None, payload=None, headers=None):
         Exception.__init__(self)
         self.status_code = status_code
@@ -13,9 +15,12 @@ class APIError(Exception):
         self.headers = headers
 
     def to_dict(self):
-        rv = dict(self.payload or ())
-        rv['message'] = self.message
-        return rv
+        rv = {}
+        rv["payload"] = dict(self.payload or ())
+        rv["status"] = self.status_code
+        rv["title"] = self.TITLE
+        rv["detail"] = self.message
+        return {"errors:" rv}
 
 
 def handle_api_error(error):
