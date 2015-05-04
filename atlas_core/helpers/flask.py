@@ -9,7 +9,7 @@ class APIError(Exception):
 
     def __init__(self, status_code, message=None, payload=None, headers=None):
         Exception.__init__(self)
-        self.status_code = status_code
+        self.status_code = str(status_code)
         self.message = message
         self.payload = payload
         self.headers = headers
@@ -20,7 +20,7 @@ class APIError(Exception):
         rv["status"] = self.status_code
         rv["title"] = self.TITLE
         rv["detail"] = self.message
-        return {"errors:" rv}
+        return {"errors": rv}
 
 
 def handle_api_error(error):
