@@ -8,8 +8,9 @@ functions, tools, etc.
 .. toctree::
     :maxdepth: 2
 
-    model_mixins
     core
+    model_mixins
+    testing
 
 Indices and tables
 ==================

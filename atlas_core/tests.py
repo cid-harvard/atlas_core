@@ -5,9 +5,10 @@ from .core import db
 from atlas_core import factories
 
 
-class ChassisTestCase(TestCase):
+class BaseTestCase(TestCase):
     """Base TestCase to add in convenience functions, defaults and custom
-    asserts."""
+    asserts. Uses app factory and creates / tears down db.
+    """
 
     def create_app(self):
         return create_app(config={"TESTING": True})
@@ -20,7 +21,7 @@ class ChassisTestCase(TestCase):
         db.drop_all()
 
 
-class TestCat(ChassisTestCase):
+class TestCat(BaseTestCase):
 
     SQLALCHEMY_DATABASE_URI = "sqlite://:memory:"
 
