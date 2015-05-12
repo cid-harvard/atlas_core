@@ -3,8 +3,13 @@
 Core
 ====
 
-Python API Reference
---------------------
-
 .. automodule:: atlas_core.core
     :members:
+
+
+App Factory
+===========
+
+.. automodule:: atlas_core
+    :members:
+

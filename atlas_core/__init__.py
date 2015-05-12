@@ -7,6 +7,8 @@ from .sample.views import sample_app
 
 
 def create_app(config={}):
+    """App factory. Creates a Flask `app` object and imports extensions, sets
+    config variables etc."""
     app = Flask("atlas_core")
     app.config.from_envvar("FLASK_CONFIG")
     app.config.update(config)
