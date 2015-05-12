@@ -9,7 +9,7 @@ functions, tools, etc.
     :maxdepth: 2
 
     model_mixins
-    architecture
+    core
 
 Indices and tables
 ==================

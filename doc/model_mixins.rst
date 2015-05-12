@@ -1,4 +1,4 @@
-.. _projectmessage:
+.. _model_mixins:
 
 Model Mixins
 ============
