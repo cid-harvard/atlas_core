@@ -11,7 +11,7 @@ def read(fname, lines=False):
 
 setup(
     name="atlas_core",
-    version="0.1",
+    version="v0.1",
     author="Mali Akmanalp <Harvard CID>",
     description=("Core building blocks for atlas projects at CID."),
     url="http://github.com/cid-harvard/atlas_core",
