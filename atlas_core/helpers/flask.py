@@ -4,6 +4,8 @@ from functools import wraps
 
 
 class APIError(Exception):
+    """A Base API error class to be raised, that returns a json-api compliant
+    error message."""
 
     TITLE = "An error occurred while processing your request."
 
@@ -24,6 +26,7 @@ class APIError(Exception):
 
 
 def handle_api_error(error):
+    """Error handler for flask that handles :py:class:`~APIError` instances."""
     response = jsonify(error.to_dict())
     response.status_code = error.status_code
     response.headers.update(error.headers)
