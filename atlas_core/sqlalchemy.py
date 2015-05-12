@@ -3,6 +3,8 @@ from .core import db
 
 
 class BaseQuery(db.Query):
+    """Base Query object that includes a number of convenience functions for
+    common patterns."""
 
     def get_or_abort(self, obj_id, http_code=404):
         """Get an object or return an error code."""
@@ -21,6 +23,7 @@ class BaseQuery(db.Query):
         :param enum: Enum column from model, e.g. Vehicle.type
         :param value: Value to filter by
         :param possible_values: None or list of acceptable values for `value`
+        :param http_code int: pass
         """
         if value is None:
             return self
@@ -37,6 +40,8 @@ class BaseQuery(db.Query):
 
 
 class BaseModel(db.Model):
+    """Base Model object that sets sane defaults like InnoDB and utf8 for
+    mysql, etc."""
     __abstract__ = True
     __table_args__ = {
         'mysql_engine': 'InnoDB',

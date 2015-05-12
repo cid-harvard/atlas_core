@@ -9,6 +9,7 @@ functions, tools, etc.
     :maxdepth: 2
 
     core
+    model_bases
     model_mixins
     testing
 
