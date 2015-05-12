@@ -7,6 +7,9 @@ functions, tools, etc.
 
 [![Build Status](https://travis-ci.org/cid-harvard/atlas_core.svg?branch=master)](https://travis-ci.org/cid-harvard/atlas_core)
 [![Coverage Status](https://coveralls.io/repos/cid-harvard/atlas_core/badge.svg)](https://coveralls.io/r/cid-harvard/atlas_core)
+[![Documentation Status](https://readthedocs.org/projects/atlas-core/badge/?version=latest)](https://readthedocs.org/projects/atlas-core/?badge=latest)
+
+Documentation can be found [here](http://atlas-core.readthedocs.org/en/latest/).
 
 Development
 -----------
