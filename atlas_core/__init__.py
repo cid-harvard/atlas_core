@@ -6,27 +6,48 @@ from .core import db, babel
 from .sample.views import sample_app
 
 
-def create_app(config={}):
-    """App factory. Creates a Flask `app` object and imports extensions, sets
-    config variables etc."""
-    app = Flask("atlas_core")
+def load_config(app, additional_config={}):
+    """Load configuration from environment variable plus from additional
+    dictionary for test cases."""
     app.config.from_envvar("FLASK_CONFIG")
-    app.config.update(config)
+    app.config.update(additional_config)
+    return app
 
-    app.register_blueprint(sample_app)
 
-    # Internal
-    db.init_app(app)
-    babel.init_app(app)
+def add_profiler(app):
+    """Add a profiler that runs on every request when PROFILE set to True."""
+    if app.config.get("PROFILE", False):
+        app.wsgi_app = ProfilerMiddleware(app.wsgi_app,
+                                          restrictions=[30],
+                                          sort_by=("time", "cumulative"))
+    return app
 
+
+def create_db(app, db):
+    """Create database from models."""
     with app.app_context():
         db.create_all()
 
+
+def create_app(additional_config={}, name="atlas_core", standalone=False):
+    """App factory. Creates a Flask `app` object and imports extensions, sets
+    config variables etc."""
+
+    app = Flask(name)
+    app = load_config(app, additional_config)
+
+    # Register blueprints
+    app.register_blueprint(sample_app)
+
+    # Load extensions
+    db.init_app(app)
+    babel.init_app(app)
+
     # Debug tools
     if app.debug:
-        if app.config.get("PROFILE", False):
-            app.wsgi_app = ProfilerMiddleware(app.wsgi_app,
-                                              restrictions=[30],
-                                              sort_by=("time", "cumulative"))
+        app = add_profiler(app)
+
+    if standalone:
+        create_db(app, db)
 
     return app

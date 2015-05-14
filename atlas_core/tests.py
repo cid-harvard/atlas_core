@@ -11,7 +11,7 @@ class BaseTestCase(TestCase):
     """
 
     def create_app(self):
-        return create_app(config={"TESTING": True})
+        return create_app(additional_config={"TESTING": True})
 
     def setUp(self):
         db.create_all()
