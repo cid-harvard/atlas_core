@@ -3,7 +3,6 @@ from flask import Flask
 from werkzeug.contrib.profiler import ProfilerMiddleware
 
 from .core import db, babel
-from .sample.views import sample_app
 
 
 def load_config(app, additional_config={}):
@@ -36,8 +35,10 @@ def create_app(additional_config={}, name="atlas_core", standalone=False):
     app = Flask(name)
     app = load_config(app, additional_config)
 
-    # Register blueprints
-    app.register_blueprint(sample_app)
+    if not standalone:
+        # Register blueprints
+        from .sample.views import sample_app
+        app.register_blueprint(sample_app)
 
     # Load extensions
     db.init_app(app)
