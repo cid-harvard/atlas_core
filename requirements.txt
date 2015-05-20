@@ -1,6 +1,6 @@
 Flask==0.10.1
 Flask-Babel==0.9
 SQLAlchemy==0.9.8
-flask-sqlalchemy==2.0
+git+https://github.com/nickw444/flask-sqlalchemy.git@a801e50035009c107a6628937320a0fd4957d86c#egg=flask-sqlalchemy
 flask-script==2.0.5
-marshmallow==1.2.2
+git+https://github.com/marshmallow-code/marshmallow.git@16cb352c80318d01ec3aff4c62863153bbdfec04#egg=marshmallow
