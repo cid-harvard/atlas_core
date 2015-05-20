@@ -11,12 +11,19 @@ def read(fname, lines=False):
 
 setup(
     name="atlas_core",
-    version="v0.2.1",
+    version="v0.2.2",
     author="Mali Akmanalp <Harvard CID>",
     description=("Core building blocks for atlas projects at CID."),
     url="http://github.com/cid-harvard/atlas_core",
     packages=find_packages(exclude=["atlas_core.sample"]),
-    install_requires=read("requirements.txt", lines=True),
+    install_requires=[
+        'Flask>=0.10.1,<1',
+        'Flask-Babel>=0.9,<1',
+        'SQLAlchemy>=0.9.8,<1',
+        'flask-sqlalchemy>=2.0,<3',
+        'flask-script>=2.0.5,<2',
+        'marshmallow>=1.2.2,<2,'
+    ],
     long_description=read('README.md'),
     classifiers=[
         "Framework :: Flask",
