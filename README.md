@@ -1,10 +1,7 @@
 Atlas-Core
 ==========
 
-Atlas-core is a collection of building blocks for the new atlas projects at
-Harvard CID - it contains things like common models and model mixins, helper
-functions, tools, etc.
-
+Test Edit!
 [![Build Status](https://travis-ci.org/cid-harvard/atlas_core.svg?branch=master)](https://travis-ci.org/cid-harvard/atlas_core)
 [![Coverage Status](https://coveralls.io/repos/cid-harvard/atlas_core/badge.svg)](https://coveralls.io/r/cid-harvard/atlas_core)
 [![Documentation Status](https://readthedocs.org/projects/atlas-core/badge/?version=latest)](https://readthedocs.org/projects/atlas-core/?badge=latest)
