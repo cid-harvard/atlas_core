@@ -11,7 +11,7 @@ class APIError(Exception):
 
     def __init__(self, status_code, message=None, payload=None, headers=None):
         Exception.__init__(self)
-        self.status_code = str(status_code)
+        self.status_code = status_code
         self.message = message
         self.payload = payload
         self.headers = headers
@@ -29,7 +29,9 @@ def handle_api_error(error):
     """Error handler for flask that handles :py:class:`~APIError` instances."""
     response = jsonify(error.to_dict())
     response.status_code = error.status_code
-    response.headers.update(error.headers)
+    if error.headers:
+        for key, value in error.headers.items():
+            response.headers[key] = value
     return response
 
 
