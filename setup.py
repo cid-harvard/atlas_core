@@ -11,7 +11,7 @@ def read(fname, lines=False):
 
 setup(
     name="atlas_core",
-    version="v0.2.4",
+    version="v0.2.5",
     author="Mali Akmanalp <Harvard CID>",
     description=("Core building blocks for atlas projects at CID."),
     url="http://github.com/cid-harvard/atlas_core",
@@ -21,7 +21,7 @@ setup(
         'Flask-Babel>=0.9,<1',
         'SQLAlchemy>=0.9.8,<1',
         'flask-sqlalchemy>=2.0,<3',
-        'flask-script>=2.0.5,<2',
+        'flask-script>=2.0.5,<3',
         'marshmallow>=1.2.2,<2,'
     ],
     long_description=read('README.md'),
