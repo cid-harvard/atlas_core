@@ -3,4 +3,4 @@ Flask-Babel==0.9
 SQLAlchemy==0.9.8
 git+https://github.com/nickw444/flask-sqlalchemy.git@a801e50035009c107a6628937320a0fd4957d86c#egg=flask-sqlalchemy
 flask-script==2.0.5
-git+https://github.com/marshmallow-code/marshmallow.git@16cb352c80318d01ec3aff4c62863153bbdfec04#egg=marshmallow
+marshmallow==2.0.0b4
