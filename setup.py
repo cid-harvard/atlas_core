@@ -22,7 +22,7 @@ setup(
         'SQLAlchemy>=1.0.0,<2',
         'flask-sqlalchemy>=2.0,<3',
         'flask-script>=2.0.5,<3',
-        'marshmallow>=1.2.2,<2,'
+        'marshmallow>=1.2.2,<2'
     ],
     long_description=read('README.md'),
     classifiers=[
