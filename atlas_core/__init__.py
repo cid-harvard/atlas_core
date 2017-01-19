@@ -2,7 +2,7 @@ from flask import Flask
 
 from werkzeug.contrib.profiler import ProfilerMiddleware
 
-from .core import db, babel
+from .core import db
 
 
 def load_config(app, additional_config={}):
@@ -42,7 +42,6 @@ def create_app(additional_config={}, name="atlas_core", standalone=False):
 
     # Load extensions
     db.init_app(app)
-    babel.init_app(app)
 
     # Debug tools
     if app.debug:
