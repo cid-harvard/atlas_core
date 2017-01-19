@@ -10,25 +10,20 @@ class IDMixin(object):
         return "<{0}: {1}>".format(self.__class__.__name__, self.id)
 
 
-class LanguageMixin(object):
-    """
-    Mixin to include language support in a database object, plus convenience
-    functions.
-    """
-    # TODO: Write a make_languages(lang_list, string_length) to have this not
-    # be hardcoded values.
-
-    #: English Language
-    en = sa.Column(sa.String(50))
-
-    #: Spanish Language
-    es = sa.Column(sa.String(50))
+class I18nMixinBase(object):
 
     @hybrid_method
-    def localized_name(self, lang):
-        """Gets localized name of object. Hybrid method that works both in a db
-        query and in python.
+    def get_localized(self, field, lang):
+        """Look up the language localized version of a field by looking up
+        field_lang."""
+        return getattr(self, field + "_" + lang)
 
-        :param lang:  Two-character primary language subtags of the language,
-        according to IETF RFC 5646 section 2.2.1. E.g. 'fr' or 'en'."""
-        return getattr(self, lang)
+    @staticmethod
+    def create(fields, languages=["en"], class_name="I18nMixin"):
+        localized_fields = {}
+        for name, value in fields.items():
+            for language in languages:
+                field_name = name + "_" + language
+                localized_fields[field_name] = sa.Column(value)
+        return type(class_name, (I18nMixinBase,), localized_fields)
+
