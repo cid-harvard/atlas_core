@@ -28,17 +28,12 @@ def create_db(app, db):
         db.create_all()
 
 
-def create_app(additional_config={}, name="atlas_core", standalone=False):
+def create_app(additional_config={}, name="atlas_core"):
     """App factory. Creates a Flask `app` object and imports extensions, sets
     config variables etc."""
 
     app = Flask(name)
     app = load_config(app, additional_config)
-
-    if not standalone:
-        # Register blueprints
-        from .sample.views import sample_app
-        app.register_blueprint(sample_app)
 
     # Load extensions
     db.init_app(app)
