@@ -20,6 +20,11 @@ class LocationClassificationTest(object):
         return "department"
 
 
+class SQLAlchemyLookupStrategyTest(object):
+    def fetch(self, slice_def, query):
+        return [{"a":1}, {"b":2}, {"c":3}]
+
+
 entities = {
     "product": {
         "classification": ProductClassificationTest(),
@@ -66,7 +71,7 @@ data_slices = {
                 "levels_available": ["department"],
             },
         },
-        #"lookup_strategy": SQLAlchemyLookup(model=models.DepartmentProductYear, schema=schemas.product_year),
+        "lookup_strategy": SQLAlchemyLookupStrategyTest(),
     },
 }
 
@@ -154,4 +159,12 @@ class QueryBuilderTest(BaseTestCase):
             assert query_full == match_query(query_with_levels, data_slices, endpoints)
 
     def test_query_result(self):
-        pass
+        with self.app.test_request_context("/data/product/23/exporters/?level=department"):
+            assert request.path == "/data/product/23/exporters/"
+            assert request.args["level"] == "department"
+
+            # Request object comes in from the flask request object so we don't
+            # have to pass it in
+            api_response = flask_handle_query(entities, data_slices, endpoints)
+
+            assert api_response == [{"a":1}, {"b":2}, {"c":3}]

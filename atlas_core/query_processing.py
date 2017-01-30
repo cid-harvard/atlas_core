@@ -1,5 +1,6 @@
 from .interfaces import IClassification
 
+from flask import request
 
 class SQLAlchemyClassification(IClassification):
 
@@ -186,3 +187,18 @@ def match_query(query, data_slices, endpoints):
 
     return query
 
+
+def flask_handle_query(entities, data_slices, endpoints):
+    """Function to use to bind to a flask route, that goes from a HTTP request
+    to a query, to a response with data. """
+
+    # Recover information from the HTTP request to create a detailed query
+    # object
+    query_simple = request_to_query(request)
+    query_with_levels = infer_levels(query_simple, entities)
+    query_full = match_query(query_with_levels, data_slices, endpoints)
+
+    # Use query object to look up the data needed and return the response
+    data_slice = data_slices[query_full["slice"]]
+    lookup_strategy = data_slice["lookup_strategy"]
+    return lookup_strategy.fetch(data_slice, query_full)
