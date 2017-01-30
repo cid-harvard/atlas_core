@@ -1,6 +1,7 @@
 import unittest
+import json
 
-from flask import request
+from flask import request, jsonify
 
 from . import create_app
 from .core import db
@@ -22,7 +23,7 @@ class LocationClassificationTest(object):
 
 class SQLAlchemyLookupStrategyTest(object):
     def fetch(self, slice_def, query):
-        return [{"a":1}, {"b":2}, {"c":3}]
+        return jsonify(data=[{"a":1}, {"b":2}, {"c":3}])
 
 
 entities = {
@@ -167,4 +168,22 @@ class QueryBuilderTest(BaseTestCase):
             # have to pass it in
             api_response = flask_handle_query(entities, data_slices, endpoints)
 
-            assert api_response == [{"a":1}, {"b":2}, {"c":3}]
+            json_response = json.loads(api_response.get_data().decode("utf-8"))
+            assert json_response["data"] == [{"a":1}, {"b":2}, {"c":3}]
+
+
+class RegisterAPIsTest(BaseTestCase):
+
+    def setUp(self):
+        self.app = create_app({
+            #"SQLALCHEMY_DATABASE_URI": "sqlite://",
+            "TESTING": True
+        })
+        self.app = register_endpoints(self.app, entities, data_slices, endpoints)
+        self.test_client = self.app.test_client()
+
+
+    def test_query_result(self):
+        response = self.test_client.get("/data/product/23/exporters/?level=department")
+        json_response = json.loads(response.get_data().decode("utf-8"))
+        assert json_response["data"] == [{"a":1}, {"b":2}, {"c":3}]

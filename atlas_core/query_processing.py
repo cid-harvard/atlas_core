@@ -186,3 +186,18 @@ def flask_handle_query(entities, data_slices, endpoints):
     data_slice = data_slices[query_full["slice"]]
     lookup_strategy = data_slice["lookup_strategy"]
     return lookup_strategy.fetch(data_slice, query_full)
+
+
+def register_endpoints(app, entities, data_slices, endpoints):
+
+    def endpoint_handler_func(*args, **kwargs):
+        return flask_handle_query(entities, data_slices, endpoints)
+
+    for endpoint_name, endpoint_config in endpoints.items():
+        app.add_url_rule(
+            endpoint_config["url_pattern"],
+            endpoint=endpoint_name,
+            view_func=endpoint_handler_func
+        )
+
+    return app
