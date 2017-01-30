@@ -28,7 +28,7 @@ def create_db(app, db):
         db.create_all()
 
 
-def create_app(additional_config={}, name="atlas_core"):
+def create_app(additional_config={}, name="atlas_core", standalone=False):
     """App factory. Creates a Flask `app` object and imports extensions, sets
     config variables etc."""
 
