@@ -19,10 +19,13 @@ class APIError(Exception):
     def to_dict(self):
         rv = {}
         rv["payload"] = dict(self.payload or ())
-        rv["status"] = self.status_code
-        rv["title"] = self.TITLE
-        rv["detail"] = self.message
+        rv["status_code"] = self.status_code
+        #rv["headers"] = self.headers
+        rv["message"] = self.message
         return {"errors": rv}
+
+    def __str__(self):
+        return str(self.to_dict())
 
 
 def handle_api_error(error):

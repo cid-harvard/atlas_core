@@ -3,6 +3,7 @@ from flask import Flask
 from werkzeug.contrib.profiler import ProfilerMiddleware
 
 from .core import db
+from .helpers.flask import APIError, handle_api_error
 
 
 def load_config(app, additional_config={}):
@@ -44,5 +45,8 @@ def create_app(additional_config={}, name="atlas_core", standalone=False):
 
     if standalone:
         create_db(app, db)
+
+    if app.config.get("CATCH_API_EXCEPTIONS", True):
+        app.errorhandler(APIError)(handle_api_error)
 
     return app
