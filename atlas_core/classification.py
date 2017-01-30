@@ -2,7 +2,7 @@ from .interfaces import IClassification
 
 class SQLAlchemyClassification(IClassification):
 
-    def __init__(model):
+    def __init__(self, model):
         self.model = model
 
     def get_level_from_id(self, id):
