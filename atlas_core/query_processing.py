@@ -1,5 +1,7 @@
 from flask import request
 
+from .helpers.flask import abort
+
 def request_to_query(request):
 
     query = {
