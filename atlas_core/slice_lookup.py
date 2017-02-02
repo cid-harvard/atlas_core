@@ -1,5 +1,6 @@
 from .interfaces import ILookupStrategy
-
+from .helpers import marshmallow
+from .helpers import python as python_helpers
 
 class SQLAlchemyLookup(ILookupStrategy):
     """Look up a query in an SQLAlchemy model."""
@@ -27,14 +28,19 @@ class SQLAlchemyLookup(ILookupStrategy):
                 pass
 
             # Look up value from query, e.g. location id 5
-            value = query[key]
+            query_entity = python_helpers.find_dict_in_list(
+                query["query_entities"],
+                type=key
+            )
 
             # Generate predicate e.g. model.location_id==5
-            predicate = (key_column == value)
+            if query_entity is not None:
+                predicate = (key_column == query_entity["value"])
+                filter_predicates.append(predicate)
 
-            filter_predicates.append(predicate)
+        query = self.model.query.filter(*filter_predicates)
 
-        return self.model.query.filter(filter_predicates)
+        return marshmallow.marshal(self.schema, query)
 
 
 class DataFrameLookup(ILookupStrategy):
