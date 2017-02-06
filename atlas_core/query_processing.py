@@ -151,7 +151,7 @@ def match_query(query, data_slices, endpoints):
         # further filter the matches
         matching_slices = [(name, unmatched_fields) for name, unmatched_fields
                            in matching_slices
-                           if result_level in list(unmatched_fields.values())[0]["levels_available"][0]]
+                           if result_level in list(unmatched_fields.values())[0]["levels_available"]]
 
     # After all this, we should have only one match remaining
     if len(matching_slices) != 1:
