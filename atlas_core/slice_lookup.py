@@ -38,6 +38,10 @@ class SQLAlchemyLookup(ILookupStrategy):
                 predicate = (key_column == query_entity["value"])
                 filter_predicates.append(predicate)
 
+        # Filter by result level also
+        predicate = (self.model.level == query["result"]["level"])
+        filter_predicates.append(predicate)
+
         query = self.model.query.filter(*filter_predicates)
 
         return marshmallow.marshal(self.schema, query)
