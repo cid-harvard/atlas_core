@@ -1,4 +1,4 @@
-from flask import request
+from flask import request, jsonify
 
 from .helpers.flask import abort
 
@@ -41,7 +41,7 @@ def get_or_fail(name, dictionary):
     raise abort(400, body=msg)
 
 
-def query_matches_slice_fields(query_fields, slice_fields):
+def slice_fields_match_query(query_fields, slice_fields):
     """Does this slice have all the fields that the query needs? If so, it also
     returns the still-unmatched fields in the slice. Helper to
     match_query_to_slices that checks only one slice. """
@@ -67,41 +67,19 @@ def query_matches_slice_fields(query_fields, slice_fields):
     return (True, slice_fields)
 
 
-def match_query_to_slices(query, data_slices, endpoint, result_level):
+def match_query_to_slices(query, endpoint_slices):
     """Let's say you have a query, and it has a few fields it's requesting.
     Which data slices have all the fields the query is asking for?"""
 
-    # Filter data slices down to those that are specified in the endpoint
-    slices = {k: v for k, v in data_slices.items() if k in endpoint["slices"]}
-
-    # First filter by the query_entities that the query supplies (e.g.
-    # product_id=23)
+    # Filter by the query_entities that the query supplies (e.g. product_id=23)
     query_fields = query["query_entities"]
     matching_slices = []
-    for slice_name, slice_conf in slices.items():
-        matched, unmatched_fields = query_matches_slice_fields(query_fields, slice_conf["fields"])
+    for slice_name, slice_conf in endpoint_slices.items():
+        matched, unmatched_fields = slice_fields_match_query(query_fields, slice_conf["fields"])
         if matched:
             matching_slices.append((slice_name, unmatched_fields))
 
-    if len(matching_slices) == 0:
-        abort(400, "No matching data slices. All slices:\n {}\
-              Query:\n{}".format(endpoint["slices"], query))
-    if len(matching_slices) == 1:
-        return matching_slices[0]
-    elif len(matching_slices) > 1:
-        # TODO: Gross.
-        # Get the slices that only have the result level that we specified
-        matching_slices = [
-            x for x in matching_slices
-            if result_level in list(x[1].values())[0]["levels_available"][0]]
-
-        if len(matching_slices) == 1:
-            return matching_slices[0]
-        else:
-            abort(400, "Too many matching data slices. All slices:\n {}\
-                  Matched slices: {}\n Query:\n{}".format(endpoint["slices"],
-                                                          matching_slices,
-                                                          query))
+    return matching_slices
 
 
 def infer_levels(query, entities):
@@ -137,37 +115,72 @@ def match_query(query, data_slices, endpoints):
 
     endpoint = endpoints[query["endpoint"]]
 
-    # Did the user specify a level for the results?
-    result_level = query["result"].get("level", None)
-    if result_level is None:
-        # TODO in the future: have some notion of default levels to pick a
-        # slice, e.g. country is default, so choose country_product_year rather
-        # than department_product_year. As opposed to default slices.
-        if "default_slice" in endpoint:
-            result_level = endpoint["default_slice"]
-        else:
-            abort(400, "No result level specified by user, and no default exists. Endpoint:\n {}\
-                    Query:\n{}".format(endpoint, query))
-
-    query["result"]["level"] = result_level
+    # Filter data slices down to those that are specified in the endpoint
+    endpoint_slices = {k: v for k, v in data_slices.items() if k in endpoint["slices"]}
 
     # Try to infer which data slice to use by looking at arguments
     # e.g. For the product_exporters endpoint, if you ask for a return level of
     # departments, we use department_product_year, otherwise
     # country_product_year.
-    matched_slice_name, unmatched_fields = match_query_to_slices(query, data_slices, endpoint, result_level)
+    matching_slices = match_query_to_slices(query, endpoint_slices)
+
+    if len(matching_slices) == 0:
+        abort(400, "There are no matching slices for your query. Endpoint:\n {}\
+                Query:\n{}".format(endpoint, query))
+
+    # Did the user specify a level for the results?
+    result_level = query["result"].get("level", None)
+    if result_level is None:
+
+        # If no, is there at least a default slice specified?
+        if "default_slice" not in endpoint:
+            abort(400, "No result level specified by user, and no default exists. Endpoint:\n {}\
+                    Query:\n{}".format(endpoint, query))
+
+        # TODO in the future: have some notion of default levels to pick a
+        # slice, e.g. country is default, so choose country_product_year rather
+        # than department_product_year. As opposed to default slices.
+
+        # Is the default slice actually valid (i.e. in the list of matched slices?)
+        matching_slices = [(name, unmatched_fields) for name, unmatched_fields
+                            in matching_slices
+                            if endpoint["default_slice"] in name]
+
+    else:
+        # If there already is a result_level specified we can use that to
+        # further filter the matches
+        matching_slices = [(name, unmatched_fields) for name, unmatched_fields
+                           in matching_slices
+                           if result_level in list(unmatched_fields.values())[0]["levels_available"][0]]
+
+    # After all this, we should have only one match remaining
+    if len(matching_slices) != 1:
+        abort(400, "Wrong number of matching data slices. All slices:\n {}\
+                Matched slices: {}\n Query:\n{}".format(endpoint["slices"],
+                                                        matching_slices,
+                                                        query))
+
+    matched_slice_name, unmatched_fields = matching_slices[0]
     matched_slice = data_slices[matched_slice_name]
 
-    query["slice"] = matched_slice_name
-
+    # There should also be one unmatched field in the slice (which is the
+    # result field)
     if len(unmatched_fields) != 1:
-        # TODO: Perhaps one day support this use case
         abort(400, "We should have only one unmatched field. Unmatched:\n {}\
               Matched slices: {}\n Query:\n{}".format(unmatched_fields,
                                                       matched_slice, query))
 
     result_field_name, result_field = list(unmatched_fields.items())[0]
     query["result"]["type"] = result_field["type"]
+
+    if result_level is None and len(result_field["levels_available"]) > 1:
+        abort(400, "It's unclear what result level we should be using! Result\
+              field: {}\n Query:\n {}".format(result_field, query))
+    elif result_level is None:
+        result_level = result_field["levels_available"][0]
+
+    query["result"]["level"] = result_level
+    query["slice"] = matched_slice_name
 
     return query
 
