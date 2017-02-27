@@ -113,6 +113,13 @@ def infer_levels(query, entities):
     return query
 
 
+def fetch_field_levels(fields):
+    """Given a list of fields, fetch and concatenate the levels_available for each."""
+    return [level
+            for f in fields.values()
+            for level in f["levels_available"]]
+
+
 def match_query(query, data_slices, endpoints):
     query = copy.deepcopy(query)
 
@@ -154,11 +161,12 @@ def match_query(query, data_slices, endpoints):
                             if endpoint["default_slice"] in name]
 
     else:
+
         # If there already is a result_level specified we can use that to
         # further filter the matches
         matching_slices = [(name, unmatched_fields) for name, unmatched_fields
                            in matching_slices
-                           if result_level in list(unmatched_fields.values())[0]["levels_available"]]
+                           if result_level in fetch_field_levels(unmatched_fields)]
 
     # After all this, we should have only one match remaining
     if len(matching_slices) != 1:
