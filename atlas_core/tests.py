@@ -200,14 +200,14 @@ class QueryBuilderTest(BaseTestCase):
 
             # No result level, fill by default
             query_no_level = copy.deepcopy(query_with_levels)
-            query_no_level["result"]["level"] = None
+            del query_no_level["result"]["level"]
             assert query_full == match_query(query_no_level, data_slices, endpoints)
 
             # Change endpoint to something we know doesn't exist
-            query_bad_id = copy.deepcopy(query_with_levels)
-            query_bad_id["endpoint"] = "potato"
+            query_bad_endpoint = copy.deepcopy(query_with_levels)
+            query_bad_endpoint["endpoint"] = "potato"
             with pytest.raises(APIError) as exc:
-                match_query(query_bad_id, data_slices, endpoints)
+                match_query(query_bad_endpoint, data_slices, endpoints)
             assert "is not a valid endpoint" in str(exc.value)
 
             # Change level to something else to make it not match
@@ -221,7 +221,7 @@ class QueryBuilderTest(BaseTestCase):
             query_no_default = copy.deepcopy(query_with_levels)
             endpoints_no_default = copy.deepcopy(endpoints)
             del endpoints_no_default["product_exporters"]["default_slice"]
-            query_no_default["result"]["level"] = None
+            del query_no_default["result"]["level"]
             with pytest.raises(APIError) as exc:
                 match_query(query_no_default, data_slices, endpoints_no_default)
             assert "No result level" in str(exc.value)
