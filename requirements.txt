@@ -1,5 +1,4 @@
 Flask==0.12
 SQLAlchemy==1.0.8
 git+https://github.com/cid-harvard/flask-sqlalchemy.git@cid#egg=flask-sqlalchemy
-flask-script==2.0.5
 marshmallow==2.0.0b4
