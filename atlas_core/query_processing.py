@@ -38,7 +38,7 @@ def get_or_fail(name, dictionary):
         .format(
             name,
             list(dictionary.keys()))
-    raise abort(400, body=msg)
+    abort(400, body=msg)
 
 
 def slice_fields_match_query(query_fields, slice_fields):
@@ -110,8 +110,8 @@ def match_query(query, data_slices, endpoints):
     query = query.copy()
 
     if query["endpoint"] not in endpoints:
-        raise ValueError("{} is not a valid endpoint. Query:\n\
-                         {}".format(query["endpoint"], query))
+        abort(400, "{} is not a valid endpoint. Query:\n\
+              {}".format(query["endpoint"], query))
 
     endpoint = endpoints[query["endpoint"]]
 
