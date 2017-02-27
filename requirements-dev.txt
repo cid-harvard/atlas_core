@@ -1,4 +1,3 @@
-six
 flask-testing
 sphinx
 sphinxcontrib-httpdomain
