@@ -1,3 +1,5 @@
+import copy
+
 from flask import request, jsonify
 
 from .helpers.flask import abort
@@ -46,7 +48,7 @@ def slice_fields_match_query(query_fields, slice_fields):
     returns the still-unmatched fields in the slice. Helper to
     match_query_to_slices that checks only one slice. """
 
-    slice_fields = slice_fields.copy()
+    slice_fields = copy.deepcopy(slice_fields)
 
     for needed_field in query_fields:
 
@@ -83,14 +85,19 @@ def match_query_to_slices(query, endpoint_slices):
 
 
 def infer_levels(query, entities):
-    query = query.copy()
+    query = copy.deepcopy(query)
 
     # Fill in missing bits from query, by using the entity definitions
     # e.g. we can use the table of locations to verify location ids and fill in
     # their levels (dept, city, etc)
     for entity in query["query_entities"]:
 
-        classification = entities[entity["type"]]["classification"]
+        entity_record = entities.get(entity["type"], None)
+        if entity_record is None:
+            abort("Cannot find entity type '{}'. Query:\n\
+                {}".format(entity["type"], entity["value"], query))
+
+        classification = entity_record["classification"]
 
         # Check values are valid for given types
         # (Is 23 really a valid location id?)
@@ -107,7 +114,7 @@ def infer_levels(query, entities):
 
 
 def match_query(query, data_slices, endpoints):
-    query = query.copy()
+    query = copy.deepcopy(query)
 
     if query["endpoint"] not in endpoints:
         abort(400, "{} is not a valid endpoint. Query:\n\

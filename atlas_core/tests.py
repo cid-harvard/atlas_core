@@ -1,10 +1,13 @@
 import unittest
 import json
+import copy
 
 from flask import request, jsonify
+import pytest
 
 from . import create_app
 from .core import db
+from .helpers.flask import APIError
 from .testing import BaseTestCase
 
 from .query_processing import *
@@ -13,12 +16,18 @@ from .slice_lookup import SQLAlchemyLookup
 
 class ProductClassificationTest(object):
     def get_level_from_id(self, id):
-        return "4digit"
+        if id in [23, 30]:
+            return "4digit"
+        else:
+            return None
 
 
 class LocationClassificationTest(object):
     def get_level_from_id(self, id):
-        return "department"
+        if id in [23, 30]:
+            return "department"
+        else:
+            return None
 
 
 class SQLAlchemyLookupStrategyTest(object):
@@ -60,6 +69,19 @@ data_slices = {
                 "levels_available": ["section", "4digit"],  # subset of all available - based on data.
             },
         },
+    },
+    "country_product_year": {
+        "fields": {
+            "product": {
+                "type": "product",
+                "levels_available": ["section", "4digit"],  # subset of all available - based on data.
+            },
+            "location": {
+                "type": "location",
+                "levels_available": ["country"],
+            },
+        },
+        "lookup_strategy": SQLAlchemyLookupStrategyTest(),
     },
     "department_product_year": {
         "fields": {
@@ -153,13 +175,75 @@ class QueryBuilderTest(BaseTestCase):
 
     def test_002_infer_levels(self):
         with self.app.test_request_context("/data/product/23/exporters/?level=department"):
+
+            # Test the happy path
             assert query_with_levels == infer_levels(query_simple, entities)
+
+            # Change entity type to something bad
+            query_bad_type = copy.deepcopy(query_simple)
+            query_bad_type["query_entities"][0]["type"] = "non_existent"
+            with pytest.raises(APIError) as exc:
+                infer_levels(query_bad_type, entities)
+            assert "Cannot find entity type" in str(exc.value)
+
+            # Change entity id to something we know doesn't exist
+            query_bad_id = copy.deepcopy(query_simple)
+            query_bad_id["query_entities"][0]["value"] = 12345
+            with pytest.raises(APIError) as exc:
+                infer_levels(query_bad_id, entities)
+            assert "Cannot find" in str(exc.value)
+            assert "object with id 12345" in str(exc.value)
 
     def test_003_match_query(self):
         with self.app.test_request_context("/data/product/23/exporters/?level=department"):
             assert query_full == match_query(query_with_levels, data_slices, endpoints)
 
-    def test_query_result(self):
+            # No result level, fill by default
+            query_no_level = copy.deepcopy(query_with_levels)
+            query_no_level["result"]["level"] = None
+            assert query_full == match_query(query_no_level, data_slices, endpoints)
+
+            # Change endpoint to something we know doesn't exist
+            query_bad_id = copy.deepcopy(query_with_levels)
+            query_bad_id["endpoint"] = "potato"
+            with pytest.raises(APIError) as exc:
+                match_query(query_bad_id, data_slices, endpoints)
+            assert "is not a valid endpoint" in str(exc.value)
+
+            # Change level to something else to make it not match
+            query_bad_level = copy.deepcopy(query_with_levels)
+            query_bad_level["query_entities"][0]["level"] = "test"
+            with pytest.raises(APIError) as exc:
+                match_query(query_bad_level, data_slices, endpoints)
+            assert "no matching slices" in str(exc.value)
+
+            # No result level, and no default specified
+            query_no_default = copy.deepcopy(query_with_levels)
+            endpoints_no_default = copy.deepcopy(endpoints)
+            del endpoints_no_default["product_exporters"]["default_slice"]
+            query_no_default["result"]["level"] = None
+            with pytest.raises(APIError) as exc:
+                match_query(query_no_default, data_slices, endpoints_no_default)
+            assert "No result level" in str(exc.value)
+
+            # No matching slices
+            endpoints_no_slices = copy.deepcopy(endpoints)
+            endpoints_no_slices["product_exporters"]["slices"] = []
+            with pytest.raises(APIError) as exc:
+                match_query(query_with_levels, data_slices, endpoints_no_slices)
+            assert "no matching slices" in str(exc.value)
+
+            # No too many matching fields
+            data_slices_modified = copy.deepcopy(data_slices)
+            data_slices_modified["department_product_year"]["fields"]["otherfield"] = {
+                "type": "occupation",
+                "levels_available": ["2digit"],
+            }
+            with pytest.raises(APIError) as exc:
+                match_query(query_with_levels, data_slices_modified, endpoints)
+            assert "only one unmatched field" in str(exc.value)
+
+    def test_004_query_result(self):
         with self.app.test_request_context("/data/product/23/exporters/?level=department"):
             assert request.path == "/data/product/23/exporters/"
             assert request.args["level"] == "department"
