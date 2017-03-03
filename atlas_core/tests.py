@@ -1,13 +1,16 @@
-import unittest
 import json
 import copy
+from unittest import TestCase
 
 from flask import request, jsonify
 import pytest
+import marshmallow as ma
 
-from . import create_app
+from . import create_app, create_db
 from .core import db
 from .helpers.flask import APIError
+from .sqlalchemy import BaseModel
+from .model_mixins import IDMixin
 from .testing import BaseTestCase
 
 from .query_processing import *
@@ -254,6 +257,99 @@ class QueryBuilderTest(BaseTestCase):
 
             json_response = json.loads(api_response.get_data().decode("utf-8"))
             assert json_response["data"] == [{"a":1}, {"b":2}, {"c":3}]
+
+
+class SQLAlchemySliceLookupTest(BaseTestCase):
+
+    def setUp(self):
+        super().__init__()
+
+        class TestModel(BaseModel, IDMixin):
+            __tablename__ = "test_model"
+            product_id = db.Column(db.Integer)
+            product_level = db.Column(db.String)
+            location_id = db.Column(db.String)
+            location_level = db.Column(db.String)
+
+            year = db.Column(db.Integer)
+            export_value = db.Column(db.Integer)
+
+        self.model = TestModel
+        self.model.__table__.create(bind=db.engine)
+
+        data = [
+            [1, "section", 1, "department", 2007, 1000],
+            [2, "section", 1, "department", 2007, 100],
+            [1, "section", 1, "department", 2008, 1100],
+            [2, "section", 1, "department", 2008, 110],
+            [1, "section", 2, "department", 2007, 2000],
+            [2, "section", 2, "department", 2007, 200],
+            [1, "section", 2, "department", 2008, 2100],
+            [2, "section", 2, "department", 2008, 210],
+            [3, "4digit", 1, "department", 2007, 1000],
+            [4, "4digit", 1, "department", 2007, 100],
+            [3, "4digit", 1, "department", 2008, 1100],
+            [4, "4digit", 1, "department", 2008, 110],
+            [3, "4digit", 2, "department", 2007, 2000],
+            [4, "4digit", 2, "department", 2007, 200],
+            [3, "4digit", 2, "department", 2008, 2100],
+            [4, "4digit", 2, "department", 2008, 210],
+            [3, "4digit", 3, "city", 2007, 1000],
+            [4, "4digit", 4, "city", 2007, 100],
+            [3, "4digit", 3, "city", 2008, 1100],
+            [4, "4digit", 4, "city", 2008, 110],
+            [3, "4digit", 3, "city", 2007, 2000],
+            [4, "4digit", 4, "city", 2007, 200],
+            [3, "4digit", 3, "city", 2008, 2100],
+            [4, "4digit", 4, "city", 2008, 210],
+        ]
+        keys = ["product_id", "product_level", "location_id", "location_level", "year", "export_value"]
+        data = [dict(zip(keys, i)) for i in data]
+        db.engine.execute(self.model.__table__.insert(), data)
+
+        class TestSchema(ma.Schema):
+            class Meta:
+                fields = ("export_value", "product_id", "location_id", "year")
+        self.schema = TestSchema(many=True)
+
+        #self.app = register_endpoints(self.app, entities, data_slices, endpoints)
+        #self.test_client = self.app.test_client()
+
+        self.slice_def = {
+            "fields": {
+                "product": {
+                    "type": "product",
+                    "levels_available": ["section", "4digit"],
+                },
+            },
+        }
+
+    def test_lookup(self):
+        query = {
+            "endpoint": "product_exporters",
+            "slice": "department_product_year",
+            "result": {
+                "type": "location",
+                "level": "department",
+            },
+            "query_entities": [
+                {
+                    "type": "product",
+                    "level": "section",
+                    "value": 1,
+                },
+            ]
+        }
+        lookup = SQLAlchemyLookup(self.model, self.schema)
+        result = lookup.fetch(self.slice_def, query)
+        expected = [
+            {'year': 2007, 'location_id': '1', 'product_id': 1, 'export_value': 1000},
+            {'year': 2008, 'location_id': '1', 'product_id': 1, 'export_value': 1100},
+            {'year': 2007, 'location_id': '2', 'product_id': 1, 'export_value': 2000},
+            {'year': 2008, 'location_id': '2', 'product_id': 1, 'export_value': 2100},
+        ]
+        assert result == expected
+
 
 
 class RegisterAPIsTest(BaseTestCase):
