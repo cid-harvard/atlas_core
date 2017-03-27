@@ -267,9 +267,9 @@ class SQLAlchemySliceLookupTest(BaseTestCase):
         class TestModel(BaseModel, IDMixin):
             __tablename__ = "test_model"
             product_id = db.Column(db.Integer)
-            product_level = db.Column(db.String)
+            product_level = db.Column(db.Enum("section", "2digit", "4digit"))
             location_id = db.Column(db.String)
-            location_level = db.Column(db.String)
+            location_level = db.Column(db.Enum("city", "department"))
 
             year = db.Column(db.Integer)
             export_value = db.Column(db.Integer)
