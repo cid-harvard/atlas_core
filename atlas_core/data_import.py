@@ -71,8 +71,9 @@ def import_data(file_name="./data.h5", engine=core.db.engine):
             if key.startswith("/classifications/"):
                 table = convert_classification(table)
 
-            if "product_level" in metadata:
-                table["level"] = metadata["product_level"]
+            if "levels" in metadata:
+                for level, level_value in metadata["levels"].items():
+                    table[level+"_level"] = level_value
 
             table.to_sql(table_name, engine, index=False,
                          chunksize=10000, if_exists="append")
