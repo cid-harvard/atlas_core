@@ -48,18 +48,24 @@ def import_data(file_name="./data.h5", engine=core.db.engine):
 
     # Keeping this import inlined to avoid a dependency unless needed
     import pandas as pd
+    import sqlalchemy as sa
 
     print("Reading from file:'{}'".format(file_name))
     store = pd.HDFStore(file_name)
 
     for key in store.keys():
         print("-----------------------------------")
+        print("HDF Table: {}".format(key))
 
-        metadata = store.get_storer(key).attrs.atlas_metadata
-        print(metadata)
+        try:
+            metadata = store.get_storer(key).attrs.atlas_metadata
+            print("Metadata: {}".format(metadata))
+        except AttributeError:
+            print("Skipping {}".format(key))
+            continue
 
         table_name = metadata.get("sql_table_name", None)
-        print(key, table_name)
+        print("SQL Table: {}".format(table_name))
 
         if table_name is None:
             print("Skipping {}".format(key))
@@ -71,12 +77,16 @@ def import_data(file_name="./data.h5", engine=core.db.engine):
             if key.startswith("/classifications/"):
                 table = convert_classification(table)
 
+            dtypes = {}
             if "levels" in metadata:
-                for level, level_value in metadata["levels"].items():
-                    table[level+"_level"] = level_value
+                for entity, level_value in metadata["levels"].items():
+                    table[entity+"_level"] = level_value
+                    dtypes[entity+"_id"] = sa.types.Integer
 
             table.to_sql(table_name, engine, index=False,
-                         chunksize=10000, if_exists="append")
+                         chunksize=10000, if_exists="append",
+                         dtype=dtypes
+                         )
 
         except SQLAlchemyError as exc:
             print(exc)
