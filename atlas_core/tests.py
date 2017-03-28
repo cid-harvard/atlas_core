@@ -72,6 +72,7 @@ data_slices = {
                 "levels_available": ["section", "4digit"],  # subset of all available - based on data.
             },
         },
+        "lookup_strategy": SQLAlchemyLookupStrategyTest(),
     },
     "country_product_year": {
         "fields": {
@@ -161,6 +162,10 @@ class QueryBuilderTest(BaseTestCase):
         })
         self.test_client = self.app.test_client()
 
+        @self.app.route("/data/product/")
+        def product():
+            return "hi"
+
         @self.app.route("/data/product/<int:product_id>/exporters/")
         def product_exporters(product_id):
             return "hello"
@@ -175,6 +180,18 @@ class QueryBuilderTest(BaseTestCase):
             assert request.args["level"] == "department"
 
             assert query_simple == request_to_query(request)
+
+        with self.app.test_request_context("/data/product/?level=4digit"):
+            assert request.path == "/data/product/"
+            assert request.args["level"] == "4digit"
+
+            expected = {
+                'endpoint': 'product',
+                'query_entities': [
+                ],
+                'result': {'level': '4digit'}
+            }
+            assert expected == request_to_query(request)
 
     def test_002_infer_levels(self):
         with self.app.test_request_context("/data/product/23/exporters/?level=department"):
@@ -196,6 +213,7 @@ class QueryBuilderTest(BaseTestCase):
                 infer_levels(query_bad_id, entities)
             assert "Cannot find" in str(exc.value)
             assert "object with id 12345" in str(exc.value)
+
 
     def test_003_match_query(self):
         with self.app.test_request_context("/data/product/23/exporters/?level=department"):
@@ -246,6 +264,25 @@ class QueryBuilderTest(BaseTestCase):
                 match_query(query_with_levels, data_slices_modified, endpoints)
             assert "only one unmatched field" in str(exc.value)
 
+
+        with self.app.test_request_context("/data/product/?level=4digit"):
+            query = {
+                'endpoint': 'product',
+                'query_entities': [
+                ],
+                'result': {'level': '4digit'}
+            }
+            expected = {
+                'endpoint': 'product',
+                'slice': 'product_year',
+                'query_entities': [
+                ],
+                'result': {'level': '4digit', 'type': 'product'}
+            }
+            assert expected == match_query(query, data_slices, endpoints)
+
+
+
     def test_004_query_result(self):
         with self.app.test_request_context("/data/product/23/exporters/?level=department"):
             assert request.path == "/data/product/23/exporters/"
@@ -253,6 +290,13 @@ class QueryBuilderTest(BaseTestCase):
 
             # Request object comes in from the flask request object so we don't
             # have to pass it in
+            api_response = flask_handle_query(entities, data_slices, endpoints)
+
+            json_response = json.loads(api_response.get_data().decode("utf-8"))
+            assert json_response["data"] == [{"a":1}, {"b":2}, {"c":3}]
+
+
+        with self.app.test_request_context("/data/product/?level=4digit"):
             api_response = flask_handle_query(entities, data_slices, endpoints)
 
             json_response = json.loads(api_response.get_data().decode("utf-8"))
