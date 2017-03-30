@@ -20,17 +20,20 @@ class SQLAlchemyLookup(ILookupStrategy):
         # e.g. location_id==5 AND product_level=='4digit'
 
         filter_predicates = []
-        for key, entity_def in slice_def["fields"].items():
+        for query_entity in query["query_entities"]:
 
-            # Look up the details of the entity we're querying from query
-            # object, e.g. location has id 5 and level blah
-            query_entity = python_helpers.find_dict_in_list(
-                query["query_entities"],
-                type=key
+            # Look up the slice field that this query entity refers to
+            entity_def = python_helpers.find_dict_in_list(
+                slice_def["fields"].values(),
+                type=query_entity["type"]
             )
 
-            if query_entity is None:
-                raise ValueError("Can't find entity type {} in query: {}", key, query)
+            if entity_def is None:
+                raise ValueError("Can't find entity type {} from the query in slices: {}", query_entity["type"], slice_def)
+
+            # TODO: the above matching happens by type, but what if a query has
+            # multiple fields of the same type? We need a way to make query
+            # fields have names too. Will this simplify query processing?
 
             # Get column name e.g. "location_id", and corresponding column
             # object, e.g. model.location_id

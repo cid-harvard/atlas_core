@@ -395,6 +395,24 @@ class SQLAlchemySliceLookupTest(BaseTestCase):
         assert result == expected
 
 
+        query = {
+            'endpoint': 'product',
+            'slice': 'product_year',
+            'query_entities': [],
+            'result': {'level': '4digit', 'type': 'product'}
+        }
+        lookup = SQLAlchemyLookup(self.model, self.schema)
+        result = lookup.fetch(self.slice_def, query)
+        expected = [
+            {'year': 2007, 'location_id': '1', 'product_id': 1, 'export_value': 1000},
+            {'year': 2008, 'location_id': '1', 'product_id': 1, 'export_value': 1100},
+            {'year': 2007, 'location_id': '2', 'product_id': 1, 'export_value': 2000},
+            {'year': 2008, 'location_id': '2', 'product_id': 1, 'export_value': 2100},
+        ]
+        # Should return results only filtered by result_level which is 4digit
+        assert len(result) == 16
+
+
 
 class RegisterAPIsTest(BaseTestCase):
 
