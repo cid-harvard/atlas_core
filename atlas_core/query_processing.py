@@ -94,8 +94,8 @@ def infer_levels(query, entities):
 
         entity_record = entities.get(entity["type"], None)
         if entity_record is None:
-            abort("Cannot find entity type '{}'. Query:\n\
-                {}".format(entity["type"], entity["value"], query))
+            abort(400, "Cannot find entity type '{}'. Query:\n\
+                  {}".format(entity["type"], entity["value"], query))
 
         classification = entity_record["classification"]
 
@@ -106,8 +106,8 @@ def infer_levels(query, entities):
         if "level" not in entity:
             entry = classification.get_level_from_id(entity["value"])
             if entry is None:
-                abort("Cannot find {} object with id {}. Query:\n\
-                    {}".format(entity["type"], entity["value"], query))
+                abort(400, "Cannot find {} object with id {}. Query:\n\
+                      {}".format(entity["type"], entity["value"], query))
             entity["level"] = entry
 
     return query

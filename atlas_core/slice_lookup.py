@@ -57,7 +57,7 @@ class SQLAlchemyLookup(ILookupStrategy):
         level_predicate = (level_column == query["result"]["level"])
         filter_predicates.append(level_predicate)
 
-        q = self.model.query.filter(*filter_predicates)
+        q = list(self.model.query.filter(*filter_predicates).all())
 
         return marshmallow.marshal(self.schema, q, json=self.json)
 
