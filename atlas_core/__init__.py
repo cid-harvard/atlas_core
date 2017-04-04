@@ -19,7 +19,9 @@ def add_profiler(app):
     if app.config.get("PROFILE", False):
         app.wsgi_app = ProfilerMiddleware(app.wsgi_app,
                                           restrictions=[30],
-                                          sort_by=("time", "cumulative"))
+                                          sort_by=("time", "cumulative"),
+                                          profile_dir=app.config.get("PROFILE_DIR", None)
+                                          )
     return app
 
 
