@@ -5,9 +5,10 @@ from .helpers import python as python_helpers
 class SQLAlchemyLookup(ILookupStrategy):
     """Look up a query in an SQLAlchemy model."""
 
-    def __init__(self, model, schema=None):
+    def __init__(self, model, schema=None, json=True):
         self.model = model
         self.schema = schema
+        self.json = json
 
     def get_column_by_name(self, name):
         column = getattr(self.model, name, None)
@@ -58,7 +59,7 @@ class SQLAlchemyLookup(ILookupStrategy):
 
         q = self.model.query.filter(*filter_predicates)
 
-        return marshmallow.marshal(self.schema, q, json=False)
+        return marshmallow.marshal(self.schema, q, json=self.json)
 
 
 class DataFrameLookup(ILookupStrategy):

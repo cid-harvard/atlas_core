@@ -384,7 +384,7 @@ class SQLAlchemySliceLookupTest(BaseTestCase):
                 },
             ]
         }
-        lookup = SQLAlchemyLookup(self.model, self.schema)
+        lookup = SQLAlchemyLookup(self.model, self.schema, json=False)
         result = lookup.fetch(self.slice_def, query)
         expected = [
             {'year': 2007, 'location_id': '1', 'product_id': 1, 'export_value': 1000},
@@ -401,7 +401,7 @@ class SQLAlchemySliceLookupTest(BaseTestCase):
             'query_entities': [],
             'result': {'level': '4digit', 'type': 'product'}
         }
-        lookup = SQLAlchemyLookup(self.model, self.schema)
+        lookup = SQLAlchemyLookup(self.model, self.schema, json=False)
         result = lookup.fetch(self.slice_def, query)
         expected = [
             {'year': 2007, 'location_id': '1', 'product_id': 1, 'export_value': 1000},
