@@ -1,9 +1,9 @@
 from . import core
 
-def convert_classification(df, optional_fields=["name_es", "name_short_en",
-                                                "name_short_es",
-                                                "description_en",
-                                                "description_es"]):
+def classification_to_pandas(df, optional_fields=["name_es", "name_short_en",
+                                                  "name_short_es",
+                                                  "description_en",
+                                                  "description_es"]):
     """Convert a classification from the format it comes in the classification
     file (which is the format from the 'classifications' github repository)
     into the format that the flask apps use. Mostly just a thing for dropping
@@ -14,7 +14,7 @@ def convert_classification(df, optional_fields=["name_es", "name_short_en",
     classification, like the description fields for example.
     """
 
-    # Pull in some related fields and change names appropriately
+    # Sort fields and change names appropriately
     new_df = df[["index", "code", "name", "level", "parent_id"]]
     new_df = new_df.rename(columns={
         "index": "id",
@@ -43,7 +43,7 @@ def import_data(file_name="./data.h5", engine=core.db.engine):
 
     In addition, anything under the /classifications/ path in the HDF store
     gets treated specially as a classification, and gets run through the
-    convert_classification() function.
+    classification_to_pandas() function.
     """
 
     # Keeping this import inlined to avoid a dependency unless needed
@@ -75,7 +75,7 @@ def import_data(file_name="./data.h5", engine=core.db.engine):
             table = store[key]
 
             if key.startswith("/classifications/"):
-                table = convert_classification(table)
+                table = classification_to_pandas(table)
 
             dtypes = {}
             if "levels" in metadata:
