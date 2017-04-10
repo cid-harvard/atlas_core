@@ -12,7 +12,8 @@ from .sqlalchemy import BaseModel
 from .model_mixins import IDMixin
 from .testing import BaseTestCase
 
-from .query_processing import *
+from .query_processing import (request_to_query, infer_levels, match_query,
+                               flask_handle_query, register_endpoints)
 from .slice_lookup import SQLAlchemyLookup
 
 
@@ -152,11 +153,12 @@ query_full = {
     ]
 }
 
+
 class QueryBuilderTest(BaseTestCase):
 
     def setUp(self):
         self.app = create_app({
-            #"SQLALCHEMY_DATABASE_URI": "sqlite://",
+            # "SQLALCHEMY_DATABASE_URI": "sqlite://",
             "TESTING": True
         })
         self.test_client = self.app.test_client()
@@ -213,7 +215,6 @@ class QueryBuilderTest(BaseTestCase):
             assert "Cannot find" in str(exc.value)
             assert "object with id 12345" in str(exc.value)
 
-
     def test_003_match_query(self):
         with self.app.test_request_context("/data/product/23/exporters/?level=department"):
             assert query_full == match_query(query_with_levels, data_slices, endpoints)
@@ -263,7 +264,6 @@ class QueryBuilderTest(BaseTestCase):
                 match_query(query_with_levels, data_slices_modified, endpoints)
             assert "only one unmatched field" in str(exc.value)
 
-
         with self.app.test_request_context("/data/product/?level=4digit"):
             query = {
                 'endpoint': 'product',
@@ -279,8 +279,6 @@ class QueryBuilderTest(BaseTestCase):
                 'result': {'level': '4digit', 'type': 'product'}
             }
             assert expected == match_query(query, data_slices, endpoints)
-
-
 
     def test_004_query_result(self):
         with self.app.test_request_context("/data/product/23/exporters/?level=department"):
@@ -392,7 +390,6 @@ class SQLAlchemySliceLookupTest(BaseTestCase):
         ]
         assert result == expected
 
-
         query = {
             'endpoint': 'product',
             'slice': 'product_year',
@@ -415,7 +412,7 @@ class RegisterAPIsTest(BaseTestCase):
 
     def setUp(self):
         self.app = create_app({
-            #"SQLALCHEMY_DATABASE_URI": "sqlite://",
+            # "SQLALCHEMY_DATABASE_URI": "sqlite://",
             "TESTING": True
         })
         self.app = register_endpoints(self.app, entities, data_slices, endpoints)
