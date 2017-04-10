@@ -1,12 +1,11 @@
 import json
 import copy
-from unittest import TestCase
 
 from flask import request, jsonify
 import pytest
 import marshmallow as ma
 
-from . import create_app, create_db
+from . import create_app
 from .core import db
 from .helpers.flask import APIError
 from .sqlalchemy import BaseModel
@@ -35,7 +34,7 @@ class LocationClassificationTest(object):
 
 class SQLAlchemyLookupStrategyTest(object):
     def fetch(self, slice_def, query):
-        return jsonify(data=[{"a":1}, {"b":2}, {"c":3}])
+        return jsonify(data=[{"a": 1}, {"b": 2}, {"c": 3}])
 
 
 entities = {
@@ -107,7 +106,7 @@ query_url = "/data/product/23/exporters/?level=department"
 
 # Just using the URL, we perform some inference on the query:
 query_simple = {
-    "endpoint": "product_exporters", # Inferred from URL pattern
+    "endpoint": "product_exporters",  # Inferred from URL pattern
     "result": {
         "level": "department",  # Inferred from query param
     },
@@ -295,12 +294,11 @@ class QueryBuilderTest(BaseTestCase):
             json_response = json.loads(api_response.get_data().decode("utf-8"))
             assert json_response["data"] == [{"a":1}, {"b":2}, {"c":3}]
 
-
         with self.app.test_request_context("/data/product/?level=4digit"):
             api_response = flask_handle_query(entities, data_slices, endpoints)
 
             json_response = json.loads(api_response.get_data().decode("utf-8"))
-            assert json_response["data"] == [{"a":1}, {"b":2}, {"c":3}]
+            assert json_response["data"] == [{"a": 1}, {"b": 2}, {"c": 3}]
 
 
 class SQLAlchemySliceLookupTest(BaseTestCase):
@@ -356,8 +354,8 @@ class SQLAlchemySliceLookupTest(BaseTestCase):
                 fields = ("export_value", "product_id", "location_id", "year")
         self.schema = TestSchema(many=True)
 
-        #self.app = register_endpoints(self.app, entities, data_slices, endpoints)
-        #self.test_client = self.app.test_client()
+        # self.app = register_endpoints(self.app, entities, data_slices, endpoints)
+        # self.test_client = self.app.test_client()
 
         self.slice_def = {
             "fields": {
@@ -413,7 +411,6 @@ class SQLAlchemySliceLookupTest(BaseTestCase):
         assert len(result) == 16
 
 
-
 class RegisterAPIsTest(BaseTestCase):
 
     def setUp(self):
@@ -424,8 +421,7 @@ class RegisterAPIsTest(BaseTestCase):
         self.app = register_endpoints(self.app, entities, data_slices, endpoints)
         self.test_client = self.app.test_client()
 
-
     def test_query_result(self):
         response = self.test_client.get("/data/product/23/exporters/?level=department")
         json_response = json.loads(response.get_data().decode("utf-8"))
-        assert json_response["data"] == [{"a":1}, {"b":2}, {"c":3}]
+        assert json_response["data"] == [{"a": 1}, {"b": 2}, {"c": 3}]
