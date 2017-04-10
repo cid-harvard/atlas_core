@@ -26,7 +26,10 @@ dev: virtualenv
 	. $(ACTIVATE); FLASK_CONFIG="../conf/dev.py" $(PYTHON_EXECUTABLE) runserver.py
 
 test: virtualenv
-	. $(ACTIVATE); FLASK_CONFIG="../conf/dev.py" py.test --cov atlas_core atlas_core/tests.py
+	. $(ACTIVATE); FLASK_CONFIG="../conf/dev.py" py.test -v --cov atlas_core atlas_core/tests.py
+
+testdebug: virtualenv
+	. $(ACTIVATE); FLASK_CONFIG="../conf/dev.py" py.test -sv --pdb --pdbcls=IPython.core.debugger:Pdb --cov atlas_core atlas_core/tests.py
 
 shell: virtualenv
 	. $(ACTIVATE); FLASK_CONFIG="../conf/dev.py" $(PYTHON_EXECUTABLE) manage.py shell
