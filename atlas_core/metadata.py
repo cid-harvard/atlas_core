@@ -49,7 +49,7 @@ def make_metadata_api(classification, metadata_schema):
     return metadata_api, hierarchy_api
 
 
-def register_metadata_apis(app, entities, metadata_schema):
+def register_metadata_apis(app, entities, metadata_schema, url_prefix="metadata"):
     """Given an entity class, generate an API handler and register URL routes
     with flask. """
 
@@ -60,14 +60,14 @@ def register_metadata_apis(app, entities, metadata_schema):
 
         # Singular endpoint e.g. /entity/7
         app.add_url_rule(
-            "/{entity_name}/<int:entity_id>".format(entity_name=entity_name),
+            "/{url_prefix}/{entity_name}/<int:entity_id>".format(entity_name=entity_name, url_prefix=url_prefix),
             endpoint=entity_name + "_singular",
             view_func=metadata_api_func
         )
 
         # List endpoint e.g. /entity/
         app.add_url_rule(
-            "/{entity_name}/".format(entity_name=entity_name),
+            "/{url_prefix}/{entity_name}/".format(entity_name=entity_name, url_prefix=url_prefix),
             endpoint=entity_name + "_all",
             view_func=metadata_api_func,
             defaults={"entity_id": None}
@@ -75,7 +75,7 @@ def register_metadata_apis(app, entities, metadata_schema):
 
         # Hierarchy endpoint e.g. /entity/hierarchy?from_level=blah&to_level=blah2
         app.add_url_rule(
-            "/{entity_name}/hierarchy".format(entity_name=entity_name),
+            "/{url_prefix}/{entity_name}/hierarchy".format(entity_name=entity_name, url_prefix=url_prefix),
             endpoint=entity_name + "_hierarchy",
             view_func=hierarchy_api_func,
         )
