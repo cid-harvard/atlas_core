@@ -474,8 +474,8 @@ class SQLAlchemyClassificationTest(BaseTestCase):
         assert self.classification.get_level_by_id(0) == "top"
         assert self.classification.get_level_by_id(8) == "bottom"
 
-        assert self.classification.get_level_by_id(67) == None
-        assert self.classification.get_by_id(66) == None
+        assert self.classification.get_level_by_id(67) is None
+        assert self.classification.get_by_id(66) is None
 
         assert self.classification.get_all() == self.data
 
