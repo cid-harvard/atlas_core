@@ -1,6 +1,15 @@
 from .helpers.flask import abort
 from .core import db
 
+from sqlalchemy import inspect
+
+
+def object_as_dict(o):
+    return {
+        col.key: getattr(o, col.key)
+        for col in inspect(o).mapper.column_attrs
+    }
+
 
 class BaseQuery(db.Query):
     """Base Query object that includes a number of convenience functions for

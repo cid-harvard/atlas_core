@@ -104,7 +104,7 @@ def infer_levels(query, entities):
         # Infer level if missing
         # (Is id 23 a city or country?)
         if "level" not in entity:
-            entry = classification.get_level_from_id(entity["value"])
+            entry = classification.get_level_by_id(entity["value"])
             if entry is None:
                 abort(400, "Cannot find {} object with id {}. Query:\n\
                       {}".format(entity["type"], entity["value"], query))

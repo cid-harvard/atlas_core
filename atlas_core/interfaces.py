@@ -4,15 +4,20 @@ from abc import ABC, abstractmethod
 class IClassification(ABC):
 
     @abstractmethod
-    def get_level_from_id(self, id):
+    def get_by_id(self, id):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def get_all(self, id):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def get_level_by_id(self, id):
         """Given an id, find the level. E.g. is id 23 a department or a
         city?"""
-        pass
+        raise NotImplementedError()
 
     """
-    def get_id(self, id):
-        return self.model.query.get(id)._asdict()
-
     def get_classification(self, level=none):
         q = self.model.query
 

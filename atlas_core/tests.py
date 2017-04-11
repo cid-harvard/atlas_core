@@ -7,6 +7,7 @@ import marshmallow as ma
 
 from . import create_app
 from .core import db
+from .classification import SQLAlchemyClassification
 from .helpers.flask import APIError
 from .sqlalchemy import BaseModel
 from .model_mixins import IDMixin
@@ -18,7 +19,7 @@ from .slice_lookup import SQLAlchemyLookup
 
 
 class ProductClassificationTest(object):
-    def get_level_from_id(self, id):
+    def get_level_by_id(self, id):
         if id in [23, 30]:
             return "4digit"
         else:
@@ -26,7 +27,7 @@ class ProductClassificationTest(object):
 
 
 class LocationClassificationTest(object):
-    def get_level_from_id(self, id):
+    def get_level_by_id(self, id):
         if id in [23, 30]:
             return "department"
         else:
@@ -422,3 +423,60 @@ class RegisterAPIsTest(BaseTestCase):
         response = self.test_client.get("/data/product/23/exporters/?level=department")
         json_response = json.loads(response.get_data().decode("utf-8"))
         assert json_response["data"] == [{"a": 1}, {"b": 2}, {"c": 3}]
+
+
+class SQLAlchemyClassificationTest(BaseTestCase):
+
+    def setUp(self):
+        self.app = create_app({
+            "SQLALCHEMY_DATABASE_URI": "sqlite://",
+            "TESTING": True
+        })
+
+        class TestClassification(BaseModel):
+            __tablename__ = "test_classification"
+
+            id = db.Column(db.Integer, primary_key=True)
+            code = db.Column(db.Unicode(25))
+            level = db.Column(db.Enum("top", "mid", "low", "bottom"))
+            name = db.Column(db.String)
+            parent_id = db.Column(db.Integer)
+
+        self.model = TestClassification
+        self.classification = SQLAlchemyClassification(self.model)
+        self.model.__table__.create(bind=db.engine)
+
+        data = [
+            [0, "A", "top", "Vehicles", None],
+            [1, "A1", "mid", "Water Vehicles", 0],
+            [2, "A10", "low", "Jet-ski", 1],
+            [3, "A11", "low", "Boat", 1],
+            [4, "A111", "bottom", "Rowboat", 3],
+            [5, "A2", "mid", "Land Vehicles", 0],
+            [6, "A20", "low", "Trucks", 5],
+            [7, "A201", "bottom", "Regular Trucks", 6],
+            [8, "A202", "bottom", "Dump Trucks", 6],
+        ]
+        keys = ["id", "code", "level", "name", "parent_id"]
+        self.data = [dict(zip(keys, i)) for i in data]
+        db.engine.execute(self.model.__table__.insert(), self.data)
+
+    def test_all(self):
+        assert self.classification.get_by_id(8) == {
+            "id": 8,
+            "code": "A202",
+            "level": "bottom",
+            "name": "Dump Trucks",
+            "parent_id": 6
+        }
+
+        assert self.classification.get_level_by_id(2) == "low"
+        assert self.classification.get_level_by_id(0) == "top"
+        assert self.classification.get_level_by_id(8) == "bottom"
+
+        assert self.classification.get_level_by_id(67) == None
+        assert self.classification.get_by_id(66) == None
+
+        assert self.classification.get_all() == self.data
+
+        assert self.classification.get_all(level="bottom") == [x for x in self.data if x["level"] == "bottom"]
