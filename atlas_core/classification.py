@@ -4,6 +4,8 @@ from .sqlalchemy import object_as_dict
 
 from sqlalchemy.orm import aliased
 
+from functools import lru_cache
+
 
 class SQLAlchemyClassification(IClassification):
 
@@ -11,6 +13,7 @@ class SQLAlchemyClassification(IClassification):
         self.model = model
         self.levels = levels
 
+    @lru_cache(maxsize=None)
     def get_all(self, level=None):
         q = self.model.query
 
@@ -19,6 +22,7 @@ class SQLAlchemyClassification(IClassification):
 
         return [object_as_dict(x) for x in q.all()]
 
+    @lru_cache(maxsize=None)
     def get_by_id(self, id):
         entry = self.model.query.get(id)
 
@@ -27,6 +31,7 @@ class SQLAlchemyClassification(IClassification):
 
         return object_as_dict(entry)
 
+    @lru_cache(maxsize=None)
     def get_level_by_id(self, id):
         data = self.model.query.get(id)
 
@@ -35,6 +40,7 @@ class SQLAlchemyClassification(IClassification):
 
         return data.level
 
+    @lru_cache(maxsize=None)
     def aggregation_mapping(self, from_level, to_level, names=False):
         """Return mapping from higher level x to lower level y"""
 
