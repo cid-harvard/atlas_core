@@ -443,7 +443,7 @@ class SQLAlchemyClassificationTest(BaseTestCase):
             parent_id = db.Column(db.Integer)
 
         self.model = TestClassification
-        self.classification = SQLAlchemyClassification(self.model)
+        self.classification = SQLAlchemyClassification(self.model, ["top", "mid", "low", "bottom"])
         self.model.__table__.create(bind=db.engine)
 
         data = [
@@ -480,3 +480,21 @@ class SQLAlchemyClassificationTest(BaseTestCase):
         assert self.classification.get_all() == self.data
 
         assert self.classification.get_all(level="bottom") == [x for x in self.data if x["level"] == "bottom"]
+
+        assert self.classification.aggregation_mapping("bottom", "top") == {4: 0, 7: 0, 8: 0}
+        assert self.classification.aggregation_mapping("bottom", "mid") == {4: 1, 7: 5, 8: 5}
+        assert self.classification.aggregation_mapping("bottom", "low") == {4: 3, 7: 6, 8: 6}
+
+        assert self.classification.aggregation_mapping("low", "top") == {2: 0, 3: 0, 6: 0}
+        assert self.classification.aggregation_mapping("low", "mid") == {2: 1, 3: 1, 6: 5}
+
+        assert self.classification.aggregation_mapping("mid", "top") == {1: 0, 5: 0}
+
+        with pytest.raises(AssertionError):
+            self.classification.aggregation_mapping("mid", "mid")
+
+        with pytest.raises(ValueError):
+            self.classification.aggregation_mapping("mid", "blah")
+
+        with pytest.raises(ValueError):
+            self.classification.aggregation_mapping("top", "bottom")
