@@ -26,7 +26,7 @@ def merge_ids_from_codes(df, df_merge_on, classification, classification_column)
     rename things nicely."""
     code_to_id = classification.reset_index()[["code", "index"]].set_index("code")
     code_to_id.columns = [classification_column]
-    return df.merge(code_to_id, left_on=merge_on,
+    return df.merge(code_to_id, left_on=df_merge_on,
                     right_index=True, how="left")
 
 def process_dataset(dataset):
