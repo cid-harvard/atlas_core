@@ -1,6 +1,9 @@
 """Import from an ingested .hdf file to an sql database."""
 
+from sqlalchemy.exc import SQLAlchemyError
+
 from . import core
+
 
 def classification_to_pandas(df, optional_fields=["name_es", "name_short_en",
                                                   "name_short_es",
