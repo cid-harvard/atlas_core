@@ -42,7 +42,7 @@ def make_metadata_api(classification, metadata_schema):
         except (AssertionError, ValueError):
             abort(400, """Levels you gave me seem invalid. Are you sure
                   from_level is lower than to_level and either are valid
-                  levels?""", payload=classification.levels)
+                  levels?""", payload=dict(levels=classification.levels))
 
         return jsonify(data=mapping)
 

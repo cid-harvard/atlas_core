@@ -43,7 +43,7 @@ class BaseQuery(db.Query):
         if value not in possible_values:
             msg = "Expected one of: {0}, got {1}"\
                 .format(possible_values, value)
-            abort(http_code, body=msg)
+            abort(http_code, message=msg)
 
         return self.filter(enum == value)
 

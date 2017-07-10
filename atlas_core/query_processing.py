@@ -40,7 +40,7 @@ def get_or_fail(name, dictionary):
         .format(
             name,
             list(dictionary.keys()))
-    abort(400, body=msg)
+    abort(400, message=msg)
 
 
 def slice_fields_match_query(query_fields, slice_fields):

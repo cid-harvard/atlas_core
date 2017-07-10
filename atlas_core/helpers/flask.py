@@ -38,8 +38,8 @@ def handle_api_error(error):
     return response
 
 
-def abort(status_code, body=None, headers={}):
-    raise APIError(status_code, body, headers)
+def abort(status_code, message=None, payload=None, headers={}):
+    raise APIError(status_code, message, payload, headers)
 
 
 def headers(headers={}):
