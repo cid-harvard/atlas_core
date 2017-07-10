@@ -76,7 +76,7 @@ def process_dataset(dataset):
     except AssertionError:
         bad("Dataset has duplicate rows for entity combination: {}"
             .format(dataset["facet_fields"]))
-        bad(df[df.duplicated(subset=dataset["facet_fields"])])
+        bad(df[df.duplicated(subset=dataset["facet_fields"], keep=False)])
 
 
     # Merge in IDs for entity codes
