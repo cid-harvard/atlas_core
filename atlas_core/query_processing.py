@@ -76,6 +76,10 @@ def match_query(query, datasets, endpoints):
 
     dataset_conf = datasets[query["dataset"]]
 
+    if query["result"]["level"] is None:
+        abort(400, "You have not specified a result level(?level=foo).",
+              payload=dict(query=query, dataset_conf=dataset_conf))
+
     slices = dataset_conf["slices"]
     filtered_slices = {}
 

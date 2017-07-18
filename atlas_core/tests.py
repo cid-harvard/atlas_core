@@ -286,6 +286,13 @@ class QueryBuilderTest(BaseTestCase):
                 match_query(query_bad_level, datasets, endpoints)
             assert "no matching slices" in str(exc.value)
 
+            # Return level not specified
+            query_bad_return_level = copy.deepcopy(query_with_levels)
+            query_bad_return_level["result"]["level"] = None
+            with pytest.raises(APIError) as exc:
+                match_query(query_bad_return_level, datasets, endpoints)
+            assert "result level" in str(exc.value)
+
             # No matching slices
             datasets_no_slices = copy.deepcopy(datasets)
             datasets_no_slices["location_product_year"]["slices"] = {}
