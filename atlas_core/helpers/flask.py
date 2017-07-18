@@ -56,6 +56,23 @@ def headers(headers={}):
     return decorator
 
 
+def register_config_endpoint(app, entity_types, datasets, endpoints, url_pattern="/config"):
+    """Register an endpoint to /config that shows the dataset / endpoint /
+    entity configuration of the current app."""
+
+    def config():
+        return jsonify(endpoints=endpoints, datasets=datasets,
+                       entity_types=entity_types)
+
+    app.add_url_rule(
+        url_pattern,
+        endpoint="config",
+        view_func=config
+    )
+
+    return app
+
+
 class ForgivingJSONEncoder(JSONEncoder):
     """If object has a to_json property, use that."""
 
