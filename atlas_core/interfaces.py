@@ -38,3 +38,5 @@ class ILookupStrategy(ABC):
     def fetch(self, slice_def, query):
         pass
 
+    def to_json(self):
+        return str(self)

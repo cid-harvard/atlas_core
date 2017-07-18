@@ -3,7 +3,7 @@ from flask import Flask
 from werkzeug.contrib.profiler import ProfilerMiddleware
 
 from .core import db
-from .helpers.flask import APIError, handle_api_error
+from .helpers.flask import APIError, handle_api_error, ForgivingJSONEncoder
 
 
 def load_config(app, additional_config={}):
@@ -31,7 +31,7 @@ def create_db(app, db):
         db.create_all()
 
 
-def create_app(additional_config={}, name="atlas_core", standalone=False):
+def create_app(additional_config={}, name="atlas_core", standalone=False, custom_json_encoder=True):
     """App factory. Creates a Flask `app` object and imports extensions, sets
     config variables etc."""
 
@@ -50,5 +50,11 @@ def create_app(additional_config={}, name="atlas_core", standalone=False):
 
     if app.config.get("CATCH_API_EXCEPTIONS", True):
         app.errorhandler(APIError)(handle_api_error)
+
+    if custom_json_encoder:
+        if custom_json_encoder is True:
+            app.json_encoder = ForgivingJSONEncoder
+        else:
+            app.json_encoder = custom_json_encoder
 
     return app

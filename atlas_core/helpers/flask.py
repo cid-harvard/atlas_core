@@ -1,6 +1,7 @@
 from flask import make_response, jsonify
 
 from functools import wraps
+from json import JSONEncoder
 
 
 class APIError(Exception):
@@ -53,3 +54,13 @@ def headers(headers={}):
             return response
         return inner
     return decorator
+
+
+class ForgivingJSONEncoder(JSONEncoder):
+    """If object has a to_json property, use that."""
+
+    def default(self, obj):
+        if hasattr(obj, "to_json"):
+            return obj.to_json()
+        else:
+            return super(ForgivingJSONEncoder, self).default(obj)
