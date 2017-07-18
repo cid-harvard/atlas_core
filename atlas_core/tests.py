@@ -13,7 +13,8 @@ from .sqlalchemy import BaseModel
 from .model_mixins import IDMixin
 from .testing import BaseTestCase
 
-from .query_processing import (request_to_query, infer_levels, match_query,
+from .query_processing import (request_to_query, infer_levels,
+                               interpret_query, match_query,
                                flask_handle_query, register_endpoints)
 from .slice_lookup import SQLAlchemyLookup
 
@@ -40,7 +41,7 @@ class SQLAlchemyLookupStrategyTest(object):
 
 
 entities = {
-    "product": {
+    "hs_product": {
         "classification": ProductClassificationTest(),
     },
     "location": {
@@ -52,56 +53,73 @@ endpoints = {
     "product": {
         "url_pattern": "/data/product/",
         "arguments": [],
-        "returns": ["product", "year"],  # ?level= is for the return variable of this
-        "slices": ["product_year"],
+        "returns": ["product", "year"],
+        "dataset": "product_year",
     },
     "product_exporters": {
-        "url_pattern": "/data/product/<int:product_id>/exporters/",
+        "url_pattern": "/data/product/<int:product>/exporters/",
         "arguments": ["product"],
         "returns": ["location", "year"],
-        "slices": ["country_product_year", "department_product_year"],
-        "default_slice": "department_product_year",
+        "dataset": "location_product_year",
     },
 }
 
 
-data_slices = {
+datasets = {
     "product_year": {
-        "fields": {
+        "facets": {
             "product": {
-                "type": "product",
-                "levels_available": ["section", "4digit"],  # subset of all available - based on data.
+                "type": "hs_product",
+                "field_name": "product_id"
+            },
+            "year": {
+                "type": "year",
+                "field_name": "year",
             },
         },
-        "lookup_strategy": SQLAlchemyLookupStrategyTest(),
+        "slices": {
+            "product_year": {
+                "levels": {
+                    "product": ["section", "4digit"],
+                },
+                "lookup_strategy": SQLAlchemyLookupStrategyTest(),
+            },
+        }
     },
-    "country_product_year": {
-        "fields": {
+    "location_product_year": {
+        "facets": {
             "product": {
-                "type": "product",
-                "levels_available": ["section", "4digit"],  # subset of all available - based on data.
+                "type": "hs_product",
+                "field_name": "product_id"
             },
             "location": {
                 "type": "location",
-                "levels_available": ["country"],
+                "field_name": "location_id"
+            },
+            "year": {
+                "type": "year",
+                "field_name": "year",
             },
         },
-        "lookup_strategy": SQLAlchemyLookupStrategyTest(),
-    },
-    "department_product_year": {
-        "fields": {
-            "product": {
-                "type": "product",
-                "levels_available": ["section", "4digit"],  # subset of all available - based on data.
+        "slices": {
+            "country_product_year": {
+                "levels": {
+                    "location": ["country"],
+                    "product": ["section", "4digit"],
+                },
+                "lookup_strategy": SQLAlchemyLookupStrategyTest(),
             },
-            "location": {
-                "type": "location",
-                "levels_available": ["department"],
-            },
-        },
-        "lookup_strategy": SQLAlchemyLookupStrategyTest(),
+            "department_product_year": {
+                "levels": {
+                    "location": ["department"],
+                    "product": ["section", "4digit"],
+                },
+                "lookup_strategy": SQLAlchemyLookupStrategyTest(),
+            }
+        }
     },
 }
+
 
 # The URL as it comes in
 query_url = "/data/product/23/exporters/?level=department"
@@ -112,46 +130,68 @@ query_simple = {
     "result": {
         "level": "department",  # Inferred from query param
     },
-    "query_entities": [
-        {
-            "type": "product",  # Inferred from URL pattern
+    "arguments": {
+        "product": {
             "value": 23,  # Inferred from URL pattern
         },
-    ]
+    }
 }
 
-# After a quick lookup on the argument ids in the metadata tables, we fill in
-# missing levels
-query_with_levels = {
+# Then using the endpoint and dataset configs, we can decode more
+query_interpreted = {
     "endpoint": "product_exporters",
+    "dataset": "location_product_year",  # Inferred from endpoint config
     "result": {
+        "name": "location",  # Inferred from dataset def
+        "type": "location",  # Inferred from dataset def
         "level": "department",
     },
-    "query_entities": [
-        {
-            "type": "product",
-            "level": "4digit",  # Inferred from the product id
+    "arguments": {
+        "product": {
+            "type": "hs_product",  # Inferred from arguments and dataset definition.
             "value": 23,
         },
-    ]
+    }
+}
+
+# Consulting the classifications, we can decode the input levels
+query_with_levels = {
+    "endpoint": "product_exporters",
+    "dataset": "location_product_year",
+    "result": {
+        "name": "location",
+        "type": "location",
+        "level": "department",
+    },
+    "arguments": {
+        "product": {
+            "type": "hs_product",
+            "level": "4digit",  # Inferred from product id.
+            "value": 23,
+        },
+    }
 }
 
 # Finally, with all we have, we can now look up slices that match our query, by
 # trying to match the arguments / levels we want to the ones the slices have.
 query_full = {
     "endpoint": "product_exporters",
-    "slice": "department_product_year",  # can be inferred from the endpoint + arguments
+    "dataset": "location_product_year",
+    "slice": "department_product_year",  # Inferred from argument and result levels
     "result": {
-        "type": "location",  # can be inferred from the selected slice or level??
-        "level": "department",  # can be inferred from the selected slice default or taken from query param
+        "name": "location",
+        "field_name": "location_id",  # Inferred from dataset / slice config
+        "type": "location",
+        "level": "department",
     },
-    "query_entities": [
-        {
-            "type": "product",
+    "arguments": {
+        "product": {
+            "field_name": "product_id",  # Inferred from dataset / slice config
+            "type": "hs_product",
             "level": "4digit",
             "value": 23,
         },
-    ]
+    }
 }
 
 
@@ -168,8 +208,8 @@ class QueryBuilderTest(BaseTestCase):
         def product():
             return "hi"
 
-        @self.app.route("/data/product/<int:product_id>/exporters/")
-        def product_exporters(product_id):
+        @self.app.route("/data/product/<int:product>/exporters/")
+        def product_exporters(product):
             return "hello"
 
     def test_001_url_to_query(self):
@@ -189,112 +229,109 @@ class QueryBuilderTest(BaseTestCase):
 
             expected = {
                 'endpoint': 'product',
-                'query_entities': [
-                ],
+                'arguments': {},
                 'result': {'level': '4digit'}
             }
             assert expected == request_to_query(request)
 
-    def test_002_infer_levels(self):
+    def test_002_interpret_query(self):
         with self.app.test_request_context("/data/product/23/exporters/?level=department"):
 
             # Test the happy path
-            assert query_with_levels == infer_levels(query_simple, entities)
+            assert query_interpreted == interpret_query(query_simple, entities, datasets, endpoints)
+
+            # Change endpoint to something we know doesn't exist
+            query_bad_endpoint = copy.deepcopy(query_simple)
+            query_bad_endpoint["endpoint"] = "potato"
+            with pytest.raises(APIError) as exc:
+                interpret_query(query_bad_endpoint, entities, datasets, endpoints)
+            assert "is not a valid endpoint" in str(exc.value)
+
+            # TODO: these internal consistency checks could be done separately
+            # in advance, during load time.
+            # Check nonexistent dataset
+            # Check nonexistent facet names
+
+    def test_003_infer_levels(self):
+        with self.app.test_request_context("/data/product/23/exporters/?level=department"):
+
+            # Test the happy path
+            assert query_with_levels == infer_levels(query_interpreted, entities)
 
             # Change entity type to something bad
-            query_bad_type = copy.deepcopy(query_simple)
-            query_bad_type["query_entities"][0]["type"] = "non_existent"
+            query_bad_type = copy.deepcopy(query_interpreted)
+            query_bad_type["arguments"]["product"]["type"] = "non_existent"
             with pytest.raises(APIError) as exc:
                 infer_levels(query_bad_type, entities)
             assert "Cannot find entity type" in str(exc.value)
 
             # Change entity id to something we know doesn't exist
-            query_bad_id = copy.deepcopy(query_simple)
-            query_bad_id["query_entities"][0]["value"] = 12345
+            query_bad_id = copy.deepcopy(query_interpreted)
+            query_bad_id["arguments"]["product"]["value"] = 12345
             with pytest.raises(APIError) as exc:
                 infer_levels(query_bad_id, entities)
             assert "Cannot find" in str(exc.value)
             assert "object with id 12345" in str(exc.value)
 
-    def test_003_match_query(self):
+            # TODO: Check against bogus result level
+
+    def test_004_match_query(self):
         with self.app.test_request_context("/data/product/23/exporters/?level=department"):
-            assert query_full == match_query(query_with_levels, data_slices, endpoints)
-
-            # No result level, fill by default
-            query_no_level = copy.deepcopy(query_with_levels)
-            del query_no_level["result"]["level"]
-            assert query_full == match_query(query_no_level, data_slices, endpoints)
-
-            # Change endpoint to something we know doesn't exist
-            query_bad_endpoint = copy.deepcopy(query_with_levels)
-            query_bad_endpoint["endpoint"] = "potato"
-            with pytest.raises(APIError) as exc:
-                match_query(query_bad_endpoint, data_slices, endpoints)
-            assert "is not a valid endpoint" in str(exc.value)
+            assert query_full == match_query(query_with_levels, datasets, endpoints)
 
             # Change level to something else to make it not match
             query_bad_level = copy.deepcopy(query_with_levels)
-            query_bad_level["query_entities"][0]["level"] = "test"
+            query_bad_level["arguments"]["product"]["level"] = "test"
             with pytest.raises(APIError) as exc:
-                match_query(query_bad_level, data_slices, endpoints)
+                match_query(query_bad_level, datasets, endpoints)
             assert "no matching slices" in str(exc.value)
-
-            # No result level, and no default specified
-            query_no_default = copy.deepcopy(query_with_levels)
-            endpoints_no_default = copy.deepcopy(endpoints)
-            del endpoints_no_default["product_exporters"]["default_slice"]
-            del query_no_default["result"]["level"]
-            with pytest.raises(APIError) as exc:
-                match_query(query_no_default, data_slices, endpoints_no_default)
-            assert "No result level" in str(exc.value)
 
             # No matching slices
-            endpoints_no_slices = copy.deepcopy(endpoints)
-            endpoints_no_slices["product_exporters"]["slices"] = []
+            datasets_no_slices = copy.deepcopy(datasets)
+            datasets_no_slices["location_product_year"]["slices"] = {}
             with pytest.raises(APIError) as exc:
-                match_query(query_with_levels, data_slices, endpoints_no_slices)
+                match_query(query_with_levels, datasets_no_slices, endpoints)
             assert "no matching slices" in str(exc.value)
 
-            # No too many matching fields
-            data_slices_modified = copy.deepcopy(data_slices)
-            data_slices_modified["department_product_year"]["fields"]["otherfield"] = {
-                "type": "occupation",
-                "levels_available": ["2digit"],
-            }
+            # Too many matching slices
+            datasets_modified = copy.deepcopy(datasets)
+            datasets_modified["location_product_year"]["slices"]["country_product_year"]["levels"]["location"] = ["country", "department"]
             with pytest.raises(APIError) as exc:
-                match_query(query_with_levels, data_slices_modified, endpoints)
-            assert "only one unmatched field" in str(exc.value)
+                match_query(query_with_levels, datasets_modified, endpoints)
+            assert "too many matching slices" in str(exc.value)
 
         with self.app.test_request_context("/data/product/?level=4digit"):
             query = {
                 'endpoint': 'product',
-                'query_entities': [
-                ],
-                'result': {'level': '4digit'}
+                'dataset': 'product_year',
+                'arguments': {
+                },
+                'result': {'name': 'product', 'type': 'hs_product', 'level': '4digit'}
             }
             expected = {
                 'endpoint': 'product',
+                'dataset': 'product_year',
                 'slice': 'product_year',
-                'query_entities': [
-                ],
-                'result': {'level': '4digit', 'type': 'product'}
+                'arguments': {
+                },
+                'result': {'name': 'product', 'type': 'hs_product', 'level': '4digit', 'field_name': 'product_id'}
             }
-            assert expected == match_query(query, data_slices, endpoints)
+            assert expected == match_query(query, datasets, endpoints)
 
-    def test_004_query_result(self):
+    def test_005_query_result(self):
         with self.app.test_request_context("/data/product/23/exporters/?level=department"):
             assert request.path == "/data/product/23/exporters/"
             assert request.args["level"] == "department"
 
             # Request object comes in from the flask request object so we don't
             # have to pass it in
-            api_response = flask_handle_query(entities, data_slices, endpoints)
+            api_response = flask_handle_query(entities, datasets, endpoints)
 
             json_response = json.loads(api_response.get_data().decode("utf-8"))
             assert json_response["data"] == [{"a":1}, {"b":2}, {"c":3}]
 
         with self.app.test_request_context("/data/product/?level=4digit"):
-            api_response = flask_handle_query(entities, data_slices, endpoints)
+            api_response = flask_handle_query(entities, datasets, endpoints)
 
             json_response = json.loads(api_response.get_data().decode("utf-8"))
             assert json_response["data"] == [{"a": 1}, {"b": 2}, {"c": 3}]
@@ -368,20 +405,25 @@ class SQLAlchemySliceLookupTest(BaseTestCase):
     def test_lookup(self):
         query = {
             "endpoint": "product_exporters",
+            "dataset": "location_product_year",
             "slice": "department_product_year",
             "result": {
+                "name": "location",
+                "field_name": "location_id",
                 "type": "location",
                 "level": "department",
             },
-            "query_entities": [
-                {
-                    "type": "product",
+            "arguments": {
+                "product": {
+                    "field_name": "product_id",
+                    "type": "hs_product",
                     "level": "section",
                     "value": 1,
                 },
-            ]
+            }
         }
         lookup = SQLAlchemyLookup(self.model, self.schema, json=False)
+
         result = lookup.fetch(self.slice_def, query)
         expected = [
             {'year': 2007, 'location_id': '1', 'product_id': 1, 'export_value': 1000},
@@ -391,21 +433,31 @@ class SQLAlchemySliceLookupTest(BaseTestCase):
         ]
         assert result == expected
 
+        query["arguments"]["product"]["value"] = 2
+        result = lookup.fetch(self.slice_def, query)
+        expected = [
+            {'year': 2007, 'location_id': '1', 'product_id': 2, 'export_value': 100},
+            {'year': 2008, 'location_id': '1', 'product_id': 2, 'export_value': 110},
+            {'year': 2007, 'location_id': '2', 'product_id': 2, 'export_value': 200},
+            {'year': 2008, 'location_id': '2', 'product_id': 2, 'export_value': 210},
+        ]
+        assert result == expected
+
+
+        query["arguments"]["product"]["value"] = 9999
+        result = lookup.fetch(self.slice_def, query)
+        expected = []
+        assert result == expected
+
         query = {
             'endpoint': 'product',
             'slice': 'product_year',
-            'query_entities': [],
-            'result': {'level': '4digit', 'type': 'product'}
+            'arguments': {},
+            'result': {'level': '4digit', 'type': 'product', 'field_name': 'product_id'}
         }
         lookup = SQLAlchemyLookup(self.model, self.schema, json=False)
-        result = lookup.fetch(self.slice_def, query)
-        expected = [
-            {'year': 2007, 'location_id': '1', 'product_id': 1, 'export_value': 1000},
-            {'year': 2008, 'location_id': '1', 'product_id': 1, 'export_value': 1100},
-            {'year': 2007, 'location_id': '2', 'product_id': 1, 'export_value': 2000},
-            {'year': 2008, 'location_id': '2', 'product_id': 1, 'export_value': 2100},
-        ]
         # Should return results only filtered by result_level which is 4digit
+        result = lookup.fetch(self.slice_def, query)
         assert len(result) == 16
 
 
@@ -416,7 +468,7 @@ class RegisterAPIsTest(BaseTestCase):
             # "SQLALCHEMY_DATABASE_URI": "sqlite://",
             "TESTING": True
         })
-        self.app = register_endpoints(self.app, entities, data_slices, endpoints)
+        self.app = register_endpoints(self.app, entities, datasets, endpoints)
         self.test_client = self.app.test_client()
 
     def test_query_result(self):
