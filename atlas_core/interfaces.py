@@ -17,6 +17,9 @@ class IClassification(ABC):
         city?"""
         raise NotImplementedError()
 
+    def to_json(self):
+        return str(self)
+
     """
     def get_classification(self, level=none):
         q = self.model.query
