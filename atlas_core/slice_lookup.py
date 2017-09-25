@@ -1,6 +1,9 @@
 from .interfaces import ILookupStrategy
 from .helpers import marshmallow
-from .helpers import python as python_helpers
+
+from sqlalchemy import inspect
+from .core import db
+
 
 class SQLAlchemyLookup(ILookupStrategy):
     """Look up a query in an SQLAlchemy model."""
@@ -15,6 +18,9 @@ class SQLAlchemyLookup(ILookupStrategy):
         if column is None:
             raise ValueError("Column {} doesn't exist on model {}".format(name, self.model))
         return column
+
+    def get_all_model_columns(self):
+        return [x for x in inspect(self.model).columns]
 
     def fetch(self, slice_def, query):
         # Build a lost of predicates
@@ -47,7 +53,7 @@ class SQLAlchemyLookup(ILookupStrategy):
         level_predicate = (level_column == query["result"]["level"])
         filter_predicates.append(level_predicate)
 
-        q = list(self.model.query.filter(*filter_predicates).all())
+        q = list(db.session.query(*self.get_all_model_columns()).filter(*filter_predicates).all())
 
         return marshmallow.marshal(self.schema, q, json=self.json)
 
@@ -61,5 +67,4 @@ class DataFrameLookup(ILookupStrategy):
 
     def fetch(self, slice_def, query):
         raise NotImplementedError()
-
 
