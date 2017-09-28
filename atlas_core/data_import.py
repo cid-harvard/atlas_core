@@ -2,8 +2,6 @@
 
 from sqlalchemy.exc import SQLAlchemyError
 
-from . import core
-
 
 def classification_to_pandas(df, optional_fields=["name_es", "name_short_en",
                                                   "name_short_es",
@@ -33,7 +31,8 @@ def classification_to_pandas(df, optional_fields=["name_es", "name_short_en",
     return new_df
 
 
-def import_data(file_name="./data.h5", engine=core.db.engine):
+def import_data(file_name="./data.h5", engine=None, source_chunksize=10**6,
+                dest_chunksize=10**6):
     """Import data from a data.h5 (i.e. HDF) file into the SQL DB. This
     needs to be run from within the flask app context in order to be able to
     access the db engine currently in use.
@@ -77,21 +76,36 @@ def import_data(file_name="./data.h5", engine=core.db.engine):
             continue
 
         try:
-            table = store[key]
-
             if key.startswith("/classifications/"):
-                table = classification_to_pandas(table)
+                df = pd.read_hdf(file_name, key=key)
+                df = classification_to_pandas(df)
+                df.to_sql(table_name, engine, index=False,
+                          chunksize=dest_chunksize, if_exists="fail")
+            else:
 
-            dtypes = {}
-            if "levels" in metadata:
-                for entity, level_value in metadata["levels"].items():
-                    table[entity+"_level"] = level_value
-                    dtypes[entity+"_id"] = sa.types.Integer
+                # If it's a timeseries data table, load it in chunks to not
+                # exhaust memory all at once
+                iterator = pd.read_hdf(file_name, key=key,
+                                       chunksize=source_chunksize,
+                                       iterator=True)
 
-            table.to_sql(table_name, engine, index=False,
-                         chunksize=10000, if_exists="append",
-                         dtype=dtypes
-                         )
+                for i, df in enumerate(iterator):
+                    print(i * source_chunksize)
+
+                    # Add in level fields
+                    dtypes = {}
+                    if "levels" in metadata:
+                        for entity, level_value in metadata["levels"].items():
+                            df[entity+"_level"] = level_value
+                            dtypes[entity+"_id"] = sa.types.Integer
+
+                    df.to_sql(table_name, engine, index=False,
+                              chunksize=dest_chunksize, if_exists="append",
+                              dtype=dtypes
+                              )
+
+                    # Hint that this object should be garbage collected
+                    del df
 
         except SQLAlchemyError as exc:
             print(exc)
