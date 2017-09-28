@@ -32,7 +32,7 @@ def classification_to_pandas(df, optional_fields=["name_es", "name_short_en",
 
 
 def import_data(file_name="./data.h5", engine=None, source_chunksize=10**6,
-                dest_chunksize=10**6):
+                dest_chunksize=10**6, keys=None):
     """Import data from a data.h5 (i.e. HDF) file into the SQL DB. This
     needs to be run from within the flask app context in order to be able to
     access the db engine currently in use.
@@ -57,7 +57,10 @@ def import_data(file_name="./data.h5", engine=None, source_chunksize=10**6,
     print("Reading from file:'{}'".format(file_name))
     store = pd.HDFStore(file_name)
 
-    for key in store.keys():
+    if keys is None:
+        keys = store.keys()
+
+    for key in keys:
         print("-----------------------------------")
         print("HDF Table: {}".format(key))
 
