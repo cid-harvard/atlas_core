@@ -55,7 +55,7 @@ def import_data(file_name="./data.h5", engine=None, source_chunksize=10**6,
     import sqlalchemy as sa
 
     print("Reading from file:'{}'".format(file_name))
-    store = pd.HDFStore(file_name)
+    store = pd.HDFStore(file_name, mode="r")
 
     if keys is None:
         keys = store.keys()
