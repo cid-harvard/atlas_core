@@ -83,7 +83,8 @@ def import_data(file_name="./data.h5", engine=None, source_chunksize=10**6,
                 df = pd.read_hdf(file_name, key=key)
                 df = classification_to_pandas(df)
                 df.to_sql(table_name, engine, index=False,
-                          chunksize=dest_chunksize, if_exists="fail")
+                          chunksize=dest_chunksize, if_exists="append")
+
             else:
 
                 # If it's a timeseries data table, load it in chunks to not
