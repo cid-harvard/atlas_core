@@ -1,4 +1,4 @@
-Flask==0.12
-SQLAlchemy==1.1.6
+Flask==0.12.2
+SQLAlchemy==1.1.14
 git+https://github.com/cid-harvard/flask-sqlalchemy.git@cid#egg=flask-sqlalchemy
 marshmallow==2.0.0b4
