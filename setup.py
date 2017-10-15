@@ -17,12 +17,11 @@ setup(
     url="http://github.com/cid-harvard/atlas_core",
     packages=find_packages(exclude=["atlas_core.sample"]),
     install_requires=[
-        'Flask>=0.10.1,<1',
-        'Flask-Babel>=0.9,<1',
-        'SQLAlchemy>=1.0.0,<2',
+        'Flask>=0.12.2,<1',
+        'SQLAlchemy>=1.1.14,<2',
         'flask-sqlalchemy>=2.0,<3',
-        'flask-script>=2.0.5,<3',
-        'marshmallow>=1.2.2,<2'
+        'toastedmarshmallow==0.2.6',
+        'six>=1.0.0,<2',
     ],
     long_description=read('README.md'),
     classifiers=[
