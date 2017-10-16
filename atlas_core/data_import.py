@@ -97,16 +97,12 @@ def import_data(file_name="./data.h5", engine=None, source_chunksize=10**6,
                     print(i * source_chunksize)
 
                     # Add in level fields
-                    dtypes = {}
                     if "levels" in metadata:
                         for entity, level_value in metadata["levels"].items():
                             df[entity+"_level"] = level_value
-                            dtypes[entity+"_id"] = sa.types.Integer
 
                     df.to_sql(table_name, engine, index=False,
-                              chunksize=dest_chunksize, if_exists="append",
-                              dtype=dtypes
-                              )
+                              chunksize=dest_chunksize, if_exists="append")
 
                     # Hint that this object should be garbage collected
                     del df
