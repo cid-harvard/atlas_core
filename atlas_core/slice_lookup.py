@@ -1,5 +1,5 @@
 from .interfaces import ILookupStrategy
-from .helpers import marshmallow
+from .helpers import lima
 
 from sqlalchemy import inspect
 from .core import db
@@ -55,7 +55,7 @@ class SQLAlchemyLookup(ILookupStrategy):
 
         q = list(db.session.query(*self.get_all_model_columns()).filter(*filter_predicates).all())
 
-        return marshmallow.marshal(self.schema, q, json=self.json)
+        return lima.marshal(self.schema, q, json=self.json)
 
 
 class DataFrameLookup(ILookupStrategy):

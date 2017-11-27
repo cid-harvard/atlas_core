@@ -1,5 +1,6 @@
 Flask==0.12.2
 SQLAlchemy==1.1.14
 git+https://github.com/cid-harvard/flask-sqlalchemy.git@cid#egg=flask-sqlalchemy
-toastedmarshmallow==0.1.0
+toastedmarshmallow==0.2.6
+lima==0.5
 six

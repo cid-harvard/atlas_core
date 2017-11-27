@@ -1,6 +1,6 @@
 from flask import request, jsonify
 
-from .helpers.marshmallow import marshal
+from .helpers.lima import marshal
 from .helpers.flask import abort
 
 
@@ -19,7 +19,7 @@ def make_metadata_api(classification, metadata_schema):
         """
         if entity_id is not None:
             q = classification.get_by_id(entity_id)
-            return marshal(metadata_schema, q, many=False)
+            return marshal(metadata_schema, [q], many=False)
         else:
             level = request.args.get("level", None)
             q = classification.get_all(level=level)

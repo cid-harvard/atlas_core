@@ -21,6 +21,7 @@ setup(
         'SQLAlchemy>=1.1.14,<2',
         'flask-sqlalchemy>=2.0,<3',
         'toastedmarshmallow==0.2.6',
+        'lima>=0.5,<1',
         'six>=1.0.0,<2',
     ],
     long_description=read('README.md'),
