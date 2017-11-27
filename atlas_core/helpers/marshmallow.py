@@ -1,6 +1,9 @@
 import marshmallow as ma
 from flask import jsonify
 
+from .flask import abort
+
+
 def marshal(schema, data, json=True, many=True):
     """Shortcut to marshals a marshmallow schema and dump out a flask json
     response, or raise an APIError with appropriate messages otherwise."""
