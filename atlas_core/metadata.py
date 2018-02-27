@@ -56,7 +56,9 @@ def register_metadata_apis(app, entities, metadata_schema, url_prefix="metadata"
     for entity_name, settings in entities.items():
 
         # Generate handler function for entity
-        metadata_api_func, hierarchy_api_func = make_metadata_api(settings["classification"], metadata_schema)
+        # Get custom schema if available
+        our_metadata_schema = settings.get("schema", metadata_schema)
+        metadata_api_func, hierarchy_api_func = make_metadata_api(settings["classification"], our_metadata_schema)
 
         # Singular endpoint e.g. /entity/7
         app.add_url_rule(
