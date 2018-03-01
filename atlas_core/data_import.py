@@ -6,7 +6,10 @@ from sqlalchemy.exc import SQLAlchemyError
 def classification_to_pandas(df, optional_fields=["name_es", "name_short_en",
                                                   "name_short_es",
                                                   "description_en",
-                                                  "description_es"]):
+                                                  "description_es",
+                                                  "is_trusted",
+                                                  "in_rankings"
+                                                  ]):
     """Convert a classification from the format it comes in the classification
     file (which is the format from the 'classifications' github repository)
     into the format that the flask apps use. Mostly just a thing for dropping
