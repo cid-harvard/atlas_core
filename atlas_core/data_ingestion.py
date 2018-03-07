@@ -125,6 +125,60 @@ def process_dataset(dataset):
         facet = pd.concat(agg_outputs, axis=1)
         facet_outputs[facet_fields] = facet
 
+    # Perform aggregations by classification (e.g. aggregate 4digit products to
+    # 2digit and locations to regions, or both, etc)
+    clagg_outputs = {}
+    for clagg_name, clagg_settings in dataset.get("classification_aggregations", {}).items():
+
+        # Here is the output dataframe we now want to aggregate up
+        facet = clagg_settings["facet"]
+        base_df = facet_outputs[facet].reset_index()
+
+        # First, find out new higher_level ids, e.g. each product_id entry
+        # should be replaced from the 4digit id to its 2digit parent etc.
+        for field, agg_level_to in clagg_settings["agg_fields"].items():
+
+            # Infer classification table and level we're aggregating from, from
+            # field name
+            assert field.endswith("_id")
+            classification_name = field[:-3]
+            classifications = dataset["classification_fields"]
+            classification_table = classifications[classification_name]["classification"]
+            agg_level_from = classifications[classification_name]["level"]
+
+            # Check agg level to is a valid level
+            assert agg_level_to in classification_table.levels
+            assert agg_level_from in classification_table.levels
+
+            # Check agg_level to is higher than agg_level_from
+            assert classification_table.levels[agg_level_to] < classification_table.levels[agg_level_from]
+
+            # Get table that gives us mapping from agg_level_from to agg_level_to
+            aggregation_table = classification_table.aggregation_table(agg_level_from, agg_level_to)
+
+            # Rename column so that when we join the aggregation table we don't
+            # get a duplicate column name accidentally
+            assert "parent_id" not in facet_outputs[facet].columns
+            aggregation_table.columns = ["parent_id"]
+
+            # Join aggregation table
+            # Drop old field and replace with new aggregation table field
+            base_df = base_df\
+                .merge(aggregation_table, left_on=field, right_index=True)\
+                .drop(columns=field)\
+                .rename(columns={"parent_id": field})
+
+        # Now that we have the new parent ids for every field, perform
+        # aggregation
+        agg_df = base_df\
+            .groupby(facet)\
+            .agg(clagg_settings["agg_params"])
+
+        # Add it to the list of classification aggregation results!
+        clagg_outputs[clagg_name] = agg_df
+
+    facet_outputs["classification_aggregations"] = clagg_outputs
+
     puts("Done! ヽ(◔◡◔)ﾉ")
 
     return facet_outputs
