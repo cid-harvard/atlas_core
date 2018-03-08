@@ -161,6 +161,13 @@ def process_dataset(dataset):
             assert "parent_id" not in facet_outputs[facet].columns
             aggregation_table.columns = ["parent_id"]
 
+            # Convert the new ID field into a categorical type
+            aggregation_table.parent_id = aggregation_table\
+                .parent_id\
+                .astype(int)\
+                .astype("category",
+                        values=aggregation_table.parent_id.astype(int).unique())
+
             # Join aggregation table
             # Drop old field and replace with new aggregation table field
             base_df = base_df\
