@@ -6,7 +6,7 @@ from io import StringIO
 from clint.textui import puts, indent, colored
 import pandas as pd
 
-from reckoner import assertions
+from . import data_assertions as assertions
 
 
 def good(msg):
