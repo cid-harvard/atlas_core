@@ -176,7 +176,9 @@ def flask_handle_query(entities, datasets, endpoints):
     dataset = datasets[query_full["dataset"]]
     data_slice = dataset["slices"][query_full["slice"]]
     lookup_strategy = data_slice["lookup_strategy"]
-    return lookup_strategy.fetch(data_slice, query_full)
+    schema = data_slice.get("schema")
+
+    return lookup_strategy.fetch(data_slice, query_full, schema=schema)
 
 
 def register_endpoints(app, entities, data_slices, endpoints):

@@ -1,6 +1,7 @@
 from .interfaces import ILookupStrategy
 from .helpers import lima
 
+from flask import jsonify
 from sqlalchemy import inspect
 from .core import db
 
@@ -8,9 +9,8 @@ from .core import db
 class SQLAlchemyLookup(ILookupStrategy):
     """Look up a query in an SQLAlchemy model."""
 
-    def __init__(self, model, schema=None, json=True):
+    def __init__(self, model, json=True):
         self.model = model
-        self.schema = schema
         self.json = json
 
     def get_column_by_name(self, name):
@@ -22,7 +22,7 @@ class SQLAlchemyLookup(ILookupStrategy):
     def get_all_model_columns(self):
         return [x for x in inspect(self.model).columns]
 
-    def fetch(self, slice_def, query):
+    def fetch(self, slice_def, query, schema=None):
         # Build a lost of predicates
         # e.g. location_id==5 AND product_level=='4digit'
 
@@ -55,7 +55,13 @@ class SQLAlchemyLookup(ILookupStrategy):
 
         q = list(db.session.query(*self.get_all_model_columns()).filter(*filter_predicates).all())
 
-        return lima.marshal(self.schema, q, json=self.json)
+        if schema:
+            return lima.marshal(schema, q, json=self.json)
+        else:
+            if self.json:
+                return jsonify(q)
+            else:
+                return q
 
 
 class DataFrameLookup(ILookupStrategy):
