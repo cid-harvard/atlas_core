@@ -1,6 +1,6 @@
 import copy
 
-from flask import request
+from flask import request, jsonify
 
 from .helpers.flask import abort
 
@@ -176,13 +176,16 @@ def flask_handle_query(entities, datasets, endpoints):
     dataset = datasets[query_full["dataset"]]
     data_slice = dataset["slices"][query_full["slice"]]
     lookup_strategy = data_slice["lookup_strategy"]
-    return lookup_strategy.fetch(data_slice, query_full)
+    return lookup_strategy.fetch(data_slice, query_full, json=False)
 
 
-def register_endpoints(app, entities, data_slices, endpoints):
+def register_endpoints(app, entities, data_slices, endpoints, api_metadata=[]):
+
+    api_metadata = {x: app.config[x] for x in api_metadata}
 
     def endpoint_handler_func(*args, **kwargs):
-        return flask_handle_query(entities, data_slices, endpoints)
+        data = flask_handle_query(entities, data_slices, endpoints)
+        return jsonify(data=data, api_metadata=api_metadata)
 
     for endpoint_name, endpoint_config in endpoints.items():
         app.add_url_rule(

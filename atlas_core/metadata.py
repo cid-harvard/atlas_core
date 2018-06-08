@@ -4,7 +4,7 @@ from .helpers.lima import marshal
 from .helpers.flask import abort
 
 
-def make_metadata_api(classification, metadata_schema):
+def make_metadata_api(classification, metadata_schema, api_metadata={}):
     """Since all metadata APIs look very similar, this function just generates
     the function that'll handle the API endpoint for an entity. It generates a
     function that handles both /metadata/entity/ and /metadata/entity/<id>."""
@@ -23,7 +23,8 @@ def make_metadata_api(classification, metadata_schema):
         else:
             level = request.args.get("level", None)
             q = classification.get_all(level=level)
-            return marshal(metadata_schema, q)
+            data = marshal(metadata_schema, q, json=False)
+            return jsonify(data=data, api_metadata=api_metadata)
 
     def hierarchy_api():
         """Get the mapping of ids from a level of a classification to another
@@ -49,16 +50,18 @@ def make_metadata_api(classification, metadata_schema):
     return metadata_api, hierarchy_api
 
 
-def register_metadata_apis(app, entities, metadata_schema, url_prefix="metadata"):
+def register_metadata_apis(app, entities, metadata_schema, url_prefix="metadata", api_metadata=[]):
     """Given an entity class, generate an API handler and register URL routes
     with flask. """
+
+    api_metadata = {x: app.config[x] for x in api_metadata}
 
     for entity_name, settings in entities.items():
 
         # Generate handler function for entity
         # Get custom schema if available
         our_metadata_schema = settings.get("schema", metadata_schema)
-        metadata_api_func, hierarchy_api_func = make_metadata_api(settings["classification"], our_metadata_schema)
+        metadata_api_func, hierarchy_api_func = make_metadata_api(settings["classification"], our_metadata_schema, api_metadata)
 
         # Singular endpoint e.g. /entity/7
         app.add_url_rule(
