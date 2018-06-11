@@ -25,6 +25,18 @@ def request_to_query(request):
         }
 
     query["arguments"] = arguments
+
+    start_year = request.args.get("start_year", None)
+    end_year = request.args.get("end_year", None)
+
+    if start_year and end_year:
+        if start_year > end_year:
+            msg = "Starting year specified ({}) must be <= end year ({})"\
+                .format(start_year, end_year)
+            abort(400, message=msg, payload=dict(query=query))
+
+    query['year_range'] = {"start": start_year, "end": end_year}
+
     return query
 
 
