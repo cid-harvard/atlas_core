@@ -462,9 +462,9 @@ class SQLAlchemySliceLookupTest(BaseTestCase):
             'arguments': {},
             'result': {'level': '4digit', 'type': 'product', 'field_name': 'product_id'}
         }
-        lookup = SQLAlchemyLookup(self.model, self.schema, json=False)
+        lookup = SQLAlchemyLookup(self.model, self.schema)
         # Should return results only filtered by result_level which is 4digit
-        result = lookup.fetch(self.slice_def, query)
+        result = lookup.fetch(self.slice_def, query, json=False)
         assert len(result) == 16
 
 

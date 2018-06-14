@@ -12,6 +12,7 @@ class SQLAlchemyLookup(ILookupStrategy):
     def __init__(self, model, json=True):
         self.model = model
         self.json = json
+        self.schema = schema
 
     def get_column_by_name(self, name):
         column = getattr(self.model, name, None)
@@ -22,7 +23,7 @@ class SQLAlchemyLookup(ILookupStrategy):
     def get_all_model_columns(self):
         return [x for x in inspect(self.model).columns]
 
-    def fetch(self, slice_def, query, schema=None):
+    def fetch(self, slice_def, query, schema=None, json=True):
         # Build a lost of predicates
         # e.g. location_id==5 AND product_level=='4digit'
 
@@ -56,7 +57,7 @@ class SQLAlchemyLookup(ILookupStrategy):
         q = list(db.session.query(*self.get_all_model_columns()).filter(*filter_predicates).all())
 
         if schema:
-            return lima.marshal(schema, q, json=self.json)
+            return lima.marshal(schema, q, json=json)
         else:
             if self.json:
                 return jsonify(q)
@@ -73,4 +74,3 @@ class DataFrameLookup(ILookupStrategy):
 
     def fetch(self, slice_def, query):
         raise NotImplementedError()
-
