@@ -25,7 +25,31 @@ def request_to_query(request):
         }
 
     query["arguments"] = arguments
+    query['year_range'] = handle_year_range(request)
+
     return query
+
+
+def handle_year_range(request):
+    start_year = request.args.get("start_year", None)
+    end_year = request.args.get("end_year", None)
+
+    if start_year and not start_year.isdigit():
+        msg = "Start year ({}) is not integer."\
+                .format(start_year)
+        abort(400, message=msg)
+    if end_year and not end_year.isdigit():
+        msg = "End year ({}) is not integer."\
+                .format(end_year)
+        abort(400, message=msg)
+
+    if start_year and end_year:
+        if start_year > end_year:
+            msg = "Start year specified ({}) must be less than or equal to end year ({})."\
+                .format(start_year, end_year)
+            abort(400, message=msg)
+
+    return {"start": start_year, "end": end_year}
 
 
 def get_or_fail(name, dictionary):

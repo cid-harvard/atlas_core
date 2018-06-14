@@ -52,6 +52,17 @@ class SQLAlchemyLookup(ILookupStrategy):
         level_predicate = (level_column == query["result"]["level"])
         filter_predicates.append(level_predicate)
 
+        # Filter by year ranges
+        year_column = self.get_column_by_name('year')
+
+        if query['year_range']['start']:
+            start_predicate = (year_column >= query['year_range']['start'])
+            filter_predicates.append(start_predicate)
+
+        if query['year_range']['end']:
+            end_predicate = (year_column <= query['year_range']['end'])
+            filter_predicates.append(end_predicate)
+
         q = list(db.session.query(*self.get_all_model_columns()).filter(*filter_predicates).all())
 
         return lima.marshal(self.schema, q, json=json)
@@ -66,4 +77,3 @@ class DataFrameLookup(ILookupStrategy):
 
     def fetch(self, slice_def, query):
         raise NotImplementedError()
-
