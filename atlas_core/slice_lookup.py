@@ -9,10 +9,8 @@ from .core import db
 class SQLAlchemyLookup(ILookupStrategy):
     """Look up a query in an SQLAlchemy model."""
 
-    def __init__(self, model, json=True):
+    def __init__(self, model):
         self.model = model
-        self.json = json
-        self.schema = schema
 
     def get_column_by_name(self, name):
         column = getattr(self.model, name, None)
