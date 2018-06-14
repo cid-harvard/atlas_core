@@ -74,10 +74,15 @@ def register_config_endpoint(app, entity_types, datasets, endpoints, url_pattern
 
 
 class ForgivingJSONEncoder(JSONEncoder):
-    """If object has a to_json property, use that."""
+    """If object has a to_json property, use that. Otherwise try to do a
+    regular json encode. If that fails, return the repr() of the object as a
+    string."""
 
     def default(self, obj):
         if hasattr(obj, "to_json"):
             return obj.to_json()
         else:
-            return super(ForgivingJSONEncoder, self).default(obj)
+            try:
+                return super(ForgivingJSONEncoder, self).default(obj)
+            except TypeError:
+                return repr(obj)
