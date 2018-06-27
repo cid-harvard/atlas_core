@@ -1,6 +1,30 @@
 """Import from an ingested .hdf file to an sql database."""
 
+from collections import defaultdict
+from io import StringIO
+
+import sqlalchemy as sa
+from sqlalchemy.schema import AddConstraint, DropConstraint
+from sqlalchemy.engine import reflection
 from sqlalchemy.exc import SQLAlchemyError
+
+from atlas_core import db
+
+
+# Adapted from https://gist.github.com/mangecoeur/1fbd63d4758c2ba0c470#gistcomment-2086007
+def create_file_object(df):
+    """Creates a csv file or writes to memory"""
+    s_buf = StringIO()
+    df.to_csv(s_buf, index=False)
+    s_buf.seek(0)
+    return s_buf
+
+
+def load_to_database(session, table, columns, file_object):
+    cur = session.connection().connection.cursor()
+    columns = ', '.join([f'{col}' for col in columns])
+    sql = f'COPY {table} ({columns}) FROM STDIN WITH CSV HEADER FREEZE'
+    cur.copy_expert(sql=sql, file=file_object)
 
 
 def classification_to_pandas(df, optional_fields=["name_es", "name_short_en",
@@ -34,28 +58,10 @@ def classification_to_pandas(df, optional_fields=["name_es", "name_short_en",
     return new_df
 
 
-def import_data(file_name="./data.h5", engine=None, source_chunksize=10**6,
-                dest_chunksize=10**6, keys=None):
-    """Import data from a data.h5 (i.e. HDF) file into the SQL DB. This
-    needs to be run from within the flask app context in order to be able to
-    access the db engine currently in use.
-
-    In the HDF store, we expect to find one table per SQL table, with specific
-    attributes:
-
-        - sql_table_name: tells us which table to write to. If it doesn't
-        exist, we skip reading this table.
-        - product_level: modifies the "level" column, for cases when multiple
-        levels of data (e.g. 2digit and 4digit) get loaded into a single table
-
-    In addition, anything under the /classifications/ path in the HDF store
-    gets treated specially as a classification, and gets run through the
-    classification_to_pandas() function.
-    """
-
+def import_data_sqlite(file_name="./data.h5", engine=None,
+                       source_chunksize=10**6, dest_chunksize=10**6, keys=None):
     # Keeping this import inlined to avoid a dependency unless needed
     import pandas as pd
-    import sqlalchemy as sa
 
     print("Reading from file:'{}'".format(file_name))
     store = pd.HDFStore(file_name, mode="r")
@@ -112,3 +118,102 @@ def import_data(file_name="./data.h5", engine=None, source_chunksize=10**6,
 
         except SQLAlchemyError as exc:
             print(exc)
+
+
+def import_data_postgres(file_name="./data.h5", source_chunksize=10**6,
+                         dest_chunksize=10**6, keys=None):
+    # Keeping this import inlined to avoid a dependency unless needed
+    import pandas as pd
+
+    session = db.session
+
+    print("Reading from file:'{}'".format(file_name))
+    store = pd.HDFStore(file_name, mode="r")
+
+    if keys is None:
+        keys = store.keys()
+
+    hdf_to_sql = defaultdict(list)
+
+    print("Determining HDF/SQL table pairs")
+    for key in keys:
+        try:
+            metadata = store.get_storer(key).attrs.atlas_metadata
+            print("Metadata: {}".format(metadata))
+        except AttributeError:
+            print("Skipping {}".format(key))
+            continue
+
+        sql_name = metadata.get("sql_table_name", None)
+
+        if sql_name:
+            hdf_to_sql[sql_name].append(key)
+
+    insp = reflection.Inspector.from_engine(db.engine)
+
+    for sql_table in hdf_to_sql.keys():
+
+        # Drop PK and FKs for table
+        print("Inspecting {} keys".format(sql_table))
+        pk = db.metadata.tables[sql_table].primary_key
+        pk.name = insp.get_pk_constraint(sql_table).get('name')
+        session.execute(DropConstraint(pk))
+
+        # Truncate SQL table
+        print("Truncating {}".format(sql_table))
+        session.execute('TRUNCATE TABLE {};'.format(sql_table))
+
+        # Copy all HDF tables related to SQL table
+        hdf_tables = hdf_to_sql.get(sql_table)
+
+        if hdf_tables is None:
+            print("No HDF table found for SQL table {}".format(sql_table))
+            continue
+
+        for hdf_table in hdf_tables:
+            print("Reading HDF table {}".format(hdf_table))
+            df = store[hdf_table]
+
+            print("Creating CSV in memory for {}".format(hdf_table))
+            fo = create_file_object(df)
+
+            print("Inserting {} data".format(hdf_table))
+            load_to_database(session, sql_table, df.columns, fo)
+
+        # Adding keys back to table
+        print("Readding {} PK".format(sql_table))
+        session.execute(AddConstraint(pk))
+        session.commit()
+
+
+def import_data(file_name="./data.h5", engine=None, source_chunksize=10**6,
+                dest_chunksize=10**6, keys=None, database="postgres"):
+    """Import data from a data.h5 (i.e. HDF) file into the SQL DB. This
+    needs to be run from within the flask app context in order to be able to
+    access the db engine currently in use.
+
+    In the HDF store, we expect to find one table per SQL table, with specific
+    attributes:
+
+        - sql_table_name: tells us which table to write to. If it doesn't
+        exist, we skip reading this table.
+        - product_level: modifies the "level" column, for cases when multiple
+        levels of data (e.g. 2digit and 4digit) get loaded into a single table
+
+    In addition, anything under the /classifications/ path in the HDF store
+    gets treated specially as a classification, and gets run through the
+    classification_to_pandas() function.
+    """
+
+    if database == "postgres":
+        # No engine defined as a kwarg for postgres
+        import_data_postgres(file_name=file_name,
+                             source_chunksize=source_chunksize,
+                             dest_chunksize=dest_chunksize,
+                             keys=keys)
+
+    elif database == "sqlite":
+        import_data_sqlite(file_name=file_name, engine=engine,
+                           source_chunksize=source_chunksize,
+                           dest_chunksize=dest_chunksize,
+                           keys=keys)
