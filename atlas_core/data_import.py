@@ -128,13 +128,12 @@ def import_data_postgres(file_name="./data.h5", chunksize=10**6, keys=None):
 
     print("Reading from file:'{}'".format(file_name))
     store = pd.HDFStore(file_name, mode="r")
-
-    if keys is None:
-        keys = store.keys()
+    keys = keys or store.keys()
 
     hdf_to_sql = defaultdict(list)
+    levels = {}
 
-    print("Determining HDF/SQL table pairs")
+    print("Determining HDF/SQL table correspondances and levels")
     for key in keys:
         try:
             metadata = store.get_storer(key).attrs.atlas_metadata
@@ -143,12 +142,10 @@ def import_data_postgres(file_name="./data.h5", chunksize=10**6, keys=None):
             print("Skipping {}".format(key))
             continue
 
-        sql_name = metadata.get("sql_table_name")
-        levels = {}
-
         # Get levels for tables to use for later
         levels[metadata['sql_table_name']] = metadata['levels']
 
+        sql_name = metadata.get("sql_table_name")
         if sql_name:
             hdf_to_sql[sql_name].append(key)
 
