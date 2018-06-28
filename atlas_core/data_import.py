@@ -119,10 +119,10 @@ def import_data_sqlite(file_name="./data.h5", engine=None,
             print(exc)
 
 
-def import_data_postgres(file_name="./data.h5", source_chunksize=10**6,
-                         dest_chunksize=10**6, keys=None):
+def import_data_postgres(file_name="./data.h5", chunksize=10**6, keys=None):
     # Keeping this import inlined to avoid a dependency unless needed
     import pandas as pd
+    import numpy as np
 
     session = db.session
 
@@ -180,16 +180,30 @@ def import_data_postgres(file_name="./data.h5", source_chunksize=10**6,
             print("Reading HDF table {}".format(hdf_table))
             df = store[hdf_table]
 
-
             if hdf_table.startswith("/classifications/"):
                 print("Formatting classification {}".format(hdf_table))
                 df = classification_to_pandas(df)
 
-            print("Creating CSV in memory for {}".format(hdf_table))
-            fo = create_file_object(df)
+            # Break large dataframes into managable chunks
+            if len(df) > chunksize:
+                n_arrays = (len(df) // chunksize) + 1
+                arrays = np.array_split(df, n_arrays)
 
-            print("Inserting {} data".format(hdf_table))
-            copy_to_database(session, sql_table, df.columns, fo)
+                for i, array in enumerate(arrays):
+                    print("Creating CSV in memory for {} chunk {} of {}"
+                          .format(hdf_table, i + 1, n_arrays))
+                    fo = create_file_object(array)
+
+                    print("Inserting {} chunk {} of {}"
+                          .format(hdf_table, i + 1, n_arrays))
+                    copy_to_database(session, sql_table, df.columns, fo)
+
+            else:
+                print("Creating CSV in memory for {}".format(hdf_table))
+                fo = create_file_object(df)
+
+                print("Inserting {} data".format(hdf_table))
+                copy_to_database(session, sql_table, df.columns, fo)
 
         # Adding keys back to table
         print("Recreating {} primary key".format(sql_table))
@@ -224,8 +238,7 @@ def import_data(file_name="./data.h5", engine=None, source_chunksize=10**6,
     if database == "postgres":
         # No engine defined as a kwarg for postgres
         import_data_postgres(file_name=file_name,
-                             source_chunksize=source_chunksize,
-                             dest_chunksize=dest_chunksize,
+                             chunksize=min(source_chunksize, dest_chunksize),
                              keys=keys)
 
     elif database == "sqlite":
