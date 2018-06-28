@@ -144,6 +144,10 @@ def import_data_postgres(file_name="./data.h5", chunksize=10**6, keys=None):
             continue
 
         sql_name = metadata.get("sql_table_name")
+        levels = {}
+
+        # Get levels for tables to use for later
+        levels[metadata['sql_table_name']] = metadata['levels']
 
         if sql_name:
             hdf_to_sql[sql_name].append(key)
@@ -176,7 +180,6 @@ def import_data_postgres(file_name="./data.h5", chunksize=10**6, keys=None):
             continue
 
         for hdf_table in hdf_tables:
-
             print("Reading HDF table {}".format(hdf_table))
             df = store[hdf_table]
 
@@ -184,27 +187,44 @@ def import_data_postgres(file_name="./data.h5", chunksize=10**6, keys=None):
                 print("Formatting classification {}".format(hdf_table))
                 df = classification_to_pandas(df)
 
-            # Break large dataframes into managable chunks
-            if len(df) > chunksize:
-                n_arrays = (len(df) // chunksize) + 1
-                arrays = np.array_split(df, n_arrays)
+            # Add in level fields
+            if levels.get(sql_table):
+                print("Updating {} level fields".format(hdf_table))
+                for entity, level_value in levels.get(sql_table).items():
+                    df[entity+"_level"] = level_value
 
-                for i, array in enumerate(arrays):
-                    print("Creating CSV in memory for {} chunk {} of {}"
-                          .format(hdf_table, i + 1, n_arrays))
-                    fo = create_file_object(array)
+            try:
+                # Break large dataframes into managable chunks
+                if len(df) > chunksize:
+                    n_arrays = (len(df) // chunksize) + 1
+                    arrays = np.array_split(df, n_arrays)
 
-                    print("Inserting {} chunk {} of {}"
-                          .format(hdf_table, i + 1, n_arrays))
+                    for i, split_df in enumerate(arrays):
+                        print("Creating CSV in memory for {} chunk {} of {}"
+                              .format(hdf_table, i + 1, n_arrays))
+                        fo = create_file_object(split_df)
+
+                        print("Inserting {} chunk {} of {}"
+                              .format(hdf_table, i + 1, n_arrays))
+                        copy_to_database(session, sql_table, split_df.columns, fo)
+
+                        del split_df
+                        del fo
+
+                    del arrays
+
+                else:
+                    print("Creating CSV in memory for {}".format(hdf_table))
+                    fo = create_file_object(df)
+
+                    print("Inserting {} data".format(hdf_table))
                     copy_to_database(session, sql_table, df.columns, fo)
 
-            else:
-                print("Creating CSV in memory for {}".format(hdf_table))
-                fo = create_file_object(df)
+                    del df
+                    del fo
 
-                print("Inserting {} data".format(hdf_table))
-                copy_to_database(session, sql_table, df.columns, fo)
-
+            except SQLAlchemyError as exc:
+                print(exc)
         # Adding keys back to table
         print("Recreating {} primary key".format(sql_table))
         session.execute(AddConstraint(pk))
