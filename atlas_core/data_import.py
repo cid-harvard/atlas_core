@@ -3,10 +3,9 @@
 from collections import defaultdict
 from io import StringIO
 
-import sqlalchemy as sa
 from sqlalchemy.schema import AddConstraint, DropConstraint
-from sqlalchemy.engine import reflection
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.engine import reflection
 
 from atlas_core import db
 
@@ -20,7 +19,7 @@ def create_file_object(df):
     return s_buf
 
 
-def load_to_database(session, table, columns, file_object):
+def copy_to_database(session, table, columns, file_object):
     cur = session.connection().connection.cursor()
     columns = ', '.join([f'{col}' for col in columns])
     sql = f'COPY {table} ({columns}) FROM STDIN WITH CSV HEADER FREEZE'
@@ -144,19 +143,25 @@ def import_data_postgres(file_name="./data.h5", source_chunksize=10**6,
             print("Skipping {}".format(key))
             continue
 
-        sql_name = metadata.get("sql_table_name", None)
+        sql_name = metadata.get("sql_table_name")
 
         if sql_name:
             hdf_to_sql[sql_name].append(key)
 
+    # Drop all foreign keys first to allow for dropping PKs after
+    print("Dropping foreign keys for all tables")
     insp = reflection.Inspector.from_engine(db.engine)
+    db_foreign_keys = []
+    for sql_table in insp.get_table_names():
+        fks = db.metadata.tables[sql_table].foreign_key_constraints
+        for fk in fks:
+            session.execute(DropConstraint(fk))
+        db_foreign_keys += fks
 
     for sql_table in hdf_to_sql.keys():
-
-        # Drop PK and FKs for table
-        print("Inspecting {} keys".format(sql_table))
+        # Drop PK for table
+        print("Dropping {} primary key".format(sql_table))
         pk = db.metadata.tables[sql_table].primary_key
-        pk.name = insp.get_pk_constraint(sql_table).get('name')
         session.execute(DropConstraint(pk))
 
         # Truncate SQL table
@@ -171,19 +176,30 @@ def import_data_postgres(file_name="./data.h5", source_chunksize=10**6,
             continue
 
         for hdf_table in hdf_tables:
+
             print("Reading HDF table {}".format(hdf_table))
             df = store[hdf_table]
+
+
+            if hdf_table.startswith("/classifications/"):
+                print("Formatting classification {}".format(hdf_table))
+                df = classification_to_pandas(df)
 
             print("Creating CSV in memory for {}".format(hdf_table))
             fo = create_file_object(df)
 
             print("Inserting {} data".format(hdf_table))
-            load_to_database(session, sql_table, df.columns, fo)
+            copy_to_database(session, sql_table, df.columns, fo)
 
         # Adding keys back to table
-        print("Readding {} PK".format(sql_table))
+        print("Recreating {} primary key".format(sql_table))
         session.execute(AddConstraint(pk))
-        session.commit()
+
+    # Add foreign keys back in after all data loaded to not worry about order
+    for fk in db_foreign_keys:
+        session.execute(AddConstraint(fk))
+
+    session.commit()
 
 
 def import_data(file_name="./data.h5", engine=None, source_chunksize=10**6,
