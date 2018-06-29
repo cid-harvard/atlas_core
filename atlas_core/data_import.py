@@ -126,11 +126,17 @@ def import_data_postgres(file_name="./data.h5", chunksize=10**6, keys=None):
 
     session = db.session
 
+    print("Updating database settings")
+    # Up maintenance working memory for handling indexing, foreign keys, etc.
+    session.execute("SET maintenance_work_mem TO '1GB';")
+    session.commit()
+    print("Committed maintenance_work_mem")
+
     print("Reading from file:'{}'".format(file_name))
     store = pd.HDFStore(file_name, mode="r")
     keys = keys or store.keys()
 
-    hdf_to_sql = defaultdict(list)
+    sql_to_hdf = defaultdict(list)
     levels = {}
 
     print("Determining HDF/SQL table correspondances and levels")
@@ -147,7 +153,7 @@ def import_data_postgres(file_name="./data.h5", chunksize=10**6, keys=None):
 
         sql_name = metadata.get("sql_table_name")
         if sql_name:
-            hdf_to_sql[sql_name].append(key)
+            sql_to_hdf[sql_name].append(key)
 
     # Drop all foreign keys first to allow for dropping PKs after
     print("Dropping foreign keys for all tables")
@@ -159,7 +165,9 @@ def import_data_postgres(file_name="./data.h5", chunksize=10**6, keys=None):
             session.execute(DropConstraint(fk))
         db_foreign_keys += fks
 
-    for sql_table in hdf_to_sql.keys():
+    rows = 0
+
+    for sql_table in sql_to_hdf.keys():
         # Drop PK for table
         print("Dropping {} primary key".format(sql_table))
         pk = db.metadata.tables[sql_table].primary_key
@@ -170,7 +178,7 @@ def import_data_postgres(file_name="./data.h5", chunksize=10**6, keys=None):
         session.execute('TRUNCATE TABLE {};'.format(sql_table))
 
         # Copy all HDF tables related to SQL table
-        hdf_tables = hdf_to_sql.get(sql_table)
+        hdf_tables = sql_to_hdf.get(sql_table)
 
         if hdf_tables is None:
             print("No HDF table found for SQL table {}".format(sql_table))
@@ -179,10 +187,13 @@ def import_data_postgres(file_name="./data.h5", chunksize=10**6, keys=None):
         for hdf_table in hdf_tables:
             print("Reading HDF table {}".format(hdf_table))
             df = store[hdf_table]
+            rows += len(df)
 
+            # Handle classifications differently
             if hdf_table.startswith("/classifications/"):
                 print("Formatting classification {}".format(hdf_table))
                 df = classification_to_pandas(df)
+                columns = df.columns
 
             # Add in level fields
             if levels.get(sql_table):
@@ -194,34 +205,32 @@ def import_data_postgres(file_name="./data.h5", chunksize=10**6, keys=None):
                 # Break large dataframes into managable chunks
                 if len(df) > chunksize:
                     n_arrays = (len(df) // chunksize) + 1
-                    arrays = np.array_split(df, n_arrays)
+                    split_dfs = np.array_split(df, n_arrays)
+                    del df
 
-                    for i, split_df in enumerate(arrays):
+                    for i, split_df in enumerate(split_dfs):
                         print("Creating CSV in memory for {} chunk {} of {}"
                               .format(hdf_table, i + 1, n_arrays))
                         fo = create_file_object(split_df)
+                        del split_df
 
                         print("Inserting {} chunk {} of {}"
                               .format(hdf_table, i + 1, n_arrays))
-                        copy_to_database(session, sql_table, split_df.columns, fo)
-
-                        del split_df
+                        copy_to_database(session, sql_table, columns, fo)
                         del fo
-
-                    del arrays
 
                 else:
                     print("Creating CSV in memory for {}".format(hdf_table))
                     fo = create_file_object(df)
+                    del df
 
                     print("Inserting {} data".format(hdf_table))
-                    copy_to_database(session, sql_table, df.columns, fo)
-
-                    del df
+                    copy_to_database(session, sql_table, columns, fo)
                     del fo
 
             except SQLAlchemyError as exc:
                 print(exc)
+
         # Adding keys back to table
         print("Recreating {} primary key".format(sql_table))
         session.execute(AddConstraint(pk))
@@ -230,7 +239,10 @@ def import_data_postgres(file_name="./data.h5", chunksize=10**6, keys=None):
     for fk in db_foreign_keys:
         session.execute(AddConstraint(fk))
 
+    # Set this back to default value
+    session.execute("SET maintenance_work_mem TO '259MB';")
     session.commit()
+    print("Job complete. {} rows copied to db.".format(rows))
 
 
 def import_data(file_name="./data.h5", engine=None, source_chunksize=10**6,
