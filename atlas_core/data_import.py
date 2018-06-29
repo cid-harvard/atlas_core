@@ -162,6 +162,8 @@ def import_data_postgres(file_name="./data.h5", chunksize=10**6, keys=None):
         sql_name = metadata.get("sql_table_name")
         if sql_name:
             sql_to_hdf[sql_name].append(key)
+        else:
+            logger.warn("No SQL table name found for {}".format(key))
 
     # Drop all foreign keys first to allow for dropping PKs after
     logger.info("Dropping foreign keys for all tables")
@@ -239,7 +241,7 @@ def import_data_postgres(file_name="./data.h5", chunksize=10**6, keys=None):
                     del fo
 
             except SQLAlchemyError as exc:
-                logger.info(exc)
+                logger.error(exc)
 
         # Adding keys back to table
         logger.info("Recreating {} primary key".format(sql_table))
