@@ -1,5 +1,5 @@
 """Import from an ingested .hdf file to an sql database."""
-
+import logging
 from collections import defaultdict
 from io import StringIO
 
@@ -8,6 +8,14 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.engine import reflection
 
 from atlas_core import db
+
+# Add new formatted log handler for data_import
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(levelname)s %(asctime)s.%(msecs)03d %(message)s",
+    datefmt="%Y-%m-%d,%H:%M:%S"
+)
+logger = logging.getLogger('data_import')
 
 
 # Adapted from https://gist.github.com/mangecoeur/1fbd63d4758c2ba0c470#gistcomment-2086007
@@ -120,32 +128,32 @@ def import_data_sqlite(file_name="./data.h5", engine=None,
 
 
 def import_data_postgres(file_name="./data.h5", chunksize=10**6, keys=None):
+
     # Keeping this import inlined to avoid a dependency unless needed
     import pandas as pd
     import numpy as np
 
     session = db.session
 
-    print("Updating database settings")
+    logger.info("Updating database settings")
     # Up maintenance working memory for handling indexing, foreign keys, etc.
-    session.execute("SET maintenance_work_mem TO '1GB';")
-    session.commit()
-    print("Committed maintenance_work_mem")
+    session.execute("SET maintenance_work_mem TO 1000000;")
+    logger.info("Committed maintenance_work_mem")
 
-    print("Reading from file:'{}'".format(file_name))
+    logger.info("Reading from file:'{}'".format(file_name))
     store = pd.HDFStore(file_name, mode="r")
     keys = keys or store.keys()
 
     sql_to_hdf = defaultdict(list)
     levels = {}
 
-    print("Determining HDF/SQL table correspondances and levels")
+    logger.info("Determining HDF/SQL table correspondances and levels")
     for key in keys:
         try:
             metadata = store.get_storer(key).attrs.atlas_metadata
-            print("Metadata: {}".format(metadata))
+            logger.info("Metadata: {}".format(metadata))
         except AttributeError:
-            print("Skipping {}".format(key))
+            logger.info("Skipping {}".format(key))
             continue
 
         # Get levels for tables to use for later
@@ -156,7 +164,7 @@ def import_data_postgres(file_name="./data.h5", chunksize=10**6, keys=None):
             sql_to_hdf[sql_name].append(key)
 
     # Drop all foreign keys first to allow for dropping PKs after
-    print("Dropping foreign keys for all tables")
+    logger.info("Dropping foreign keys for all tables")
     insp = reflection.Inspector.from_engine(db.engine)
     db_foreign_keys = []
     for sql_table in insp.get_table_names():
@@ -169,37 +177,39 @@ def import_data_postgres(file_name="./data.h5", chunksize=10**6, keys=None):
 
     for sql_table in sql_to_hdf.keys():
         # Drop PK for table
-        print("Dropping {} primary key".format(sql_table))
+        logger.info("Dropping {} primary key".format(sql_table))
         pk = db.metadata.tables[sql_table].primary_key
         session.execute(DropConstraint(pk))
 
         # Truncate SQL table
-        print("Truncating {}".format(sql_table))
+        logger.info("Truncating {}".format(sql_table))
         session.execute('TRUNCATE TABLE {};'.format(sql_table))
 
         # Copy all HDF tables related to SQL table
         hdf_tables = sql_to_hdf.get(sql_table)
 
         if hdf_tables is None:
-            print("No HDF table found for SQL table {}".format(sql_table))
+            logger.info("No HDF table found for SQL table {}".format(sql_table))
             continue
 
         for hdf_table in hdf_tables:
-            print("Reading HDF table {}".format(hdf_table))
+            logger.info("Reading HDF table {}".format(hdf_table))
             df = store[hdf_table]
             rows += len(df)
 
             # Handle classifications differently
             if hdf_table.startswith("/classifications/"):
-                print("Formatting classification {}".format(hdf_table))
+                logger.info("Formatting classification {}".format(hdf_table))
                 df = classification_to_pandas(df)
-                columns = df.columns
 
             # Add in level fields
+            # TODO: this should probably be an UPDATE not part of COPY
             if levels.get(sql_table):
-                print("Updating {} level fields".format(hdf_table))
+                logger.info("Updating {} level fields".format(hdf_table))
                 for entity, level_value in levels.get(sql_table).items():
                     df[entity+"_level"] = level_value
+
+            columns = df.columns
 
             try:
                 # Break large dataframes into managable chunks
@@ -209,30 +219,30 @@ def import_data_postgres(file_name="./data.h5", chunksize=10**6, keys=None):
                     del df
 
                     for i, split_df in enumerate(split_dfs):
-                        print("Creating CSV in memory for {} chunk {} of {}"
+                        logger.info("Creating CSV in memory for {} chunk {} of {}"
                               .format(hdf_table, i + 1, n_arrays))
                         fo = create_file_object(split_df)
                         del split_df
 
-                        print("Inserting {} chunk {} of {}"
+                        logger.info("Inserting {} chunk {} of {}"
                               .format(hdf_table, i + 1, n_arrays))
                         copy_to_database(session, sql_table, columns, fo)
                         del fo
 
                 else:
-                    print("Creating CSV in memory for {}".format(hdf_table))
+                    logger.info("Creating CSV in memory for {}".format(hdf_table))
                     fo = create_file_object(df)
                     del df
 
-                    print("Inserting {} data".format(hdf_table))
+                    logger.info("Inserting {} data".format(hdf_table))
                     copy_to_database(session, sql_table, columns, fo)
                     del fo
 
             except SQLAlchemyError as exc:
-                print(exc)
+                logger.info(exc)
 
         # Adding keys back to table
-        print("Recreating {} primary key".format(sql_table))
+        logger.info("Recreating {} primary key".format(sql_table))
         session.execute(AddConstraint(pk))
 
     # Add foreign keys back in after all data loaded to not worry about order
@@ -240,9 +250,9 @@ def import_data_postgres(file_name="./data.h5", chunksize=10**6, keys=None):
         session.execute(AddConstraint(fk))
 
     # Set this back to default value
-    session.execute("SET maintenance_work_mem TO '259MB';")
+    session.execute("SET maintenance_work_mem TO 259000;")
     session.commit()
-    print("Job complete. {} rows copied to db.".format(rows))
+    logger.info("Job complete. {} rows copied to db.".format(rows))
 
 
 def import_data(file_name="./data.h5", engine=None, source_chunksize=10**6,
