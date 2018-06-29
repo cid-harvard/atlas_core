@@ -34,6 +34,19 @@ def copy_to_database(session, table, columns, file_object):
     cur.copy_expert(sql=sql, file=file_object)
 
 
+# Tried using this to update constant fields for a data set, but much slower
+def update_level_fields(db, sql_table, levels):
+    table_obj = db.metadata.tables[sql_table]
+    update_obj = table_obj.update()
+
+    for level, value in levels.get(sql_table).items():
+        col_name = level + "_level"
+        update_obj = update_obj.values({col_name: value})\
+                               .where(table_obj.c[col_name].is_(None))
+
+    return update_obj
+
+
 def classification_to_pandas(df, optional_fields=["name_es", "name_short_en",
                                                   "name_short_es",
                                                   "description_en",
@@ -204,8 +217,8 @@ def import_data_postgres(file_name="./data.h5", chunksize=10**6, keys=None):
                 logger.info("Formatting classification {}".format(hdf_table))
                 df = classification_to_pandas(df)
 
-            # Add in level fields
-            # TODO: this should probably be an UPDATE not part of COPY
+            # Add columns from level metadata to df
+            # Tried using UPDATE here but much slower than including in COPY
             if levels.get(sql_table):
                 logger.info("Updating {} level fields".format(hdf_table))
                 for entity, level_value in levels.get(sql_table).items():
