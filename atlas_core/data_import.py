@@ -140,11 +140,90 @@ def import_data_sqlite(file_name="./data.h5", engine=None,
             print(exc)
 
 
+def copy_to_postgres(session, sql_table, sql_to_hdf, file_name, levels, chunksize):
+
+    import pandas as pd
+    import numpy as np
+
+    # Drop PK for table
+    logger.info("Dropping {} primary key".format(sql_table))
+    pk = db.metadata.tables[sql_table].primary_key
+    session.execute(DropConstraint(pk))
+
+    # Truncate SQL table
+    logger.info("Truncating {}".format(sql_table))
+    session.execute('TRUNCATE TABLE {};'.format(sql_table))
+
+    # Copy all HDF tables related to SQL table
+    hdf_tables = sql_to_hdf.get(sql_table)
+
+    rows = 0
+
+    if hdf_tables is None:
+        logger.info("No HDF table found for SQL table {}".format(sql_table))
+        return rows
+
+    for hdf_table in hdf_tables:
+        logger.info("Reading HDF table {}".format(hdf_table))
+        df = pd.read_hdf(file_name, key=hdf_table)
+        rows += len(df)
+
+        # Handle classifications differently
+        if hdf_table.startswith("/classifications/"):
+            logger.info("Formatting classification {}".format(hdf_table))
+            df = classification_to_pandas(df)
+
+        # Add columns from level metadata to df
+        # Tried using UPDATE here but much slower than including in COPY
+        if levels.get(sql_table):
+            logger.info("Updating {} level fields".format(hdf_table))
+            for entity, level_value in levels.get(sql_table).items():
+                df[entity+"_level"] = level_value
+
+        columns = df.columns
+
+        try:
+            # Break large dataframes into managable chunks
+            if len(df) > chunksize:
+                n_arrays = (len(df) // chunksize) + 1
+                split_dfs = np.array_split(df, n_arrays)
+                del df
+
+                for i, split_df in enumerate(split_dfs):
+                    logger.info("Creating CSV in memory for {} chunk {} of {}"
+                          .format(hdf_table, i + 1, n_arrays))
+                    fo = create_file_object(split_df)
+                    del split_df
+
+                    logger.info("Inserting {} chunk {} of {}"
+                          .format(hdf_table, i + 1, n_arrays))
+                    copy_to_database(session, sql_table, columns, fo)
+                    del fo
+
+            else:
+                logger.info("Creating CSV in memory for {}".format(hdf_table))
+                fo = create_file_object(df)
+                del df
+
+                logger.info("Inserting {} data".format(hdf_table))
+                copy_to_database(session, sql_table, columns, fo)
+                del fo
+
+        except SQLAlchemyError as exc:
+            logger.error(exc)
+
+    # Adding keys back to table
+    logger.info("Recreating {} primary key".format(sql_table))
+    session.execute(AddConstraint(pk))
+    session.commit()
+
+    return rows
+
+
 def import_data_postgres(file_name="./data.h5", chunksize=10**6, keys=None):
 
     # Keeping this import inlined to avoid a dependency unless needed
     import pandas as pd
-    import numpy as np
 
     session = db.session
 
@@ -178,6 +257,8 @@ def import_data_postgres(file_name="./data.h5", chunksize=10**6, keys=None):
         else:
             logger.warn("No SQL table name found for {}".format(key))
 
+    store.close()
+
     # Drop all foreign keys first to allow for dropping PKs after
     logger.info("Dropping foreign keys for all tables")
     insp = reflection.Inspector.from_engine(db.engine)
@@ -191,74 +272,9 @@ def import_data_postgres(file_name="./data.h5", chunksize=10**6, keys=None):
     rows = 0
 
     for sql_table in sql_to_hdf.keys():
-        # Drop PK for table
-        logger.info("Dropping {} primary key".format(sql_table))
-        pk = db.metadata.tables[sql_table].primary_key
-        session.execute(DropConstraint(pk))
-
-        # Truncate SQL table
-        logger.info("Truncating {}".format(sql_table))
-        session.execute('TRUNCATE TABLE {};'.format(sql_table))
-
-        # Copy all HDF tables related to SQL table
-        hdf_tables = sql_to_hdf.get(sql_table)
-
-        if hdf_tables is None:
-            logger.info("No HDF table found for SQL table {}".format(sql_table))
-            continue
-
-        for hdf_table in hdf_tables:
-            logger.info("Reading HDF table {}".format(hdf_table))
-            df = store[hdf_table]
-            rows += len(df)
-
-            # Handle classifications differently
-            if hdf_table.startswith("/classifications/"):
-                logger.info("Formatting classification {}".format(hdf_table))
-                df = classification_to_pandas(df)
-
-            # Add columns from level metadata to df
-            # Tried using UPDATE here but much slower than including in COPY
-            if levels.get(sql_table):
-                logger.info("Updating {} level fields".format(hdf_table))
-                for entity, level_value in levels.get(sql_table).items():
-                    df[entity+"_level"] = level_value
-
-            columns = df.columns
-
-            try:
-                # Break large dataframes into managable chunks
-                if len(df) > chunksize:
-                    n_arrays = (len(df) // chunksize) + 1
-                    split_dfs = np.array_split(df, n_arrays)
-                    del df
-
-                    for i, split_df in enumerate(split_dfs):
-                        logger.info("Creating CSV in memory for {} chunk {} of {}"
-                              .format(hdf_table, i + 1, n_arrays))
-                        fo = create_file_object(split_df)
-                        del split_df
-
-                        logger.info("Inserting {} chunk {} of {}"
-                              .format(hdf_table, i + 1, n_arrays))
-                        copy_to_database(session, sql_table, columns, fo)
-                        del fo
-
-                else:
-                    logger.info("Creating CSV in memory for {}".format(hdf_table))
-                    fo = create_file_object(df)
-                    del df
-
-                    logger.info("Inserting {} data".format(hdf_table))
-                    copy_to_database(session, sql_table, columns, fo)
-                    del fo
-
-            except SQLAlchemyError as exc:
-                logger.error(exc)
-
-        # Adding keys back to table
-        logger.info("Recreating {} primary key".format(sql_table))
-        session.execute(AddConstraint(pk))
+        logger.info("Entering copy_to_postgres function")
+        rows += copy_to_postgres(session, sql_table, sql_to_hdf, file_name,
+                                 levels, chunksize)
 
     # Add foreign keys back in after all data loaded to not worry about order
     for fk in db_foreign_keys:
