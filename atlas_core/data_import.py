@@ -1,7 +1,7 @@
 """Import from an ingested .hdf file to an sql database."""
 from sqlalchemy.exc import SQLAlchemyError
 
-from load_data import load_postgres, classification_to_pandas
+from load_data import hdf_to_postgres, classification_to_pandas
 
 
 def import_data_sqlite(file_name="./data.h5", engine=None,
@@ -86,9 +86,9 @@ def import_data(file_name="./data.h5", engine=None, source_chunksize=10**6,
 
     if database == "postgres":
         # No engine defined as a kwarg for postgres
-        load_postgres(file_name=file_name,
-                      chunksize=min(source_chunksize, dest_chunksize),
-                      keys=keys, commit_every=True)
+        hdf_to_postgres(file_name=file_name,
+                        chunksize=min(source_chunksize, dest_chunksize),
+                        keys=keys, commit_every=True)
 
     elif database == "sqlite":
         import_data_sqlite(file_name=file_name, engine=engine,

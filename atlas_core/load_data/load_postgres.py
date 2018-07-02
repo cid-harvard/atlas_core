@@ -1,6 +1,4 @@
-"""Import from an ingested .hdf file to an sql database."""
-from . import logger
-from .utilities import create_file_object, cast_pandas, \
+from .utilities import create_file_object, cast_pandas, logger,\
                        classification_to_pandas, hdf_metadata
 from atlas_core import db
 
@@ -87,27 +85,28 @@ def copy_to_postgres(sql_table, session, sql_to_hdf, file_name, levels,
             del df
 
             for i, split_df in enumerate(split_dfs):
-                logger.info("Creating CSV in memory for {} chunk {} of {}"
-                            .format(hdf_table, i + 1, n_arrays))
+                logger.info(("Creating CSV in memory for %(table)s "
+                             "(chunk %(i)s of %(n)s)"),
+                            {'table': hdf_table, 'i': i + 1, 'n': n_arrays})
                 fo = create_file_object(split_df)
                 del split_df
 
-                logger.info("Inserting {} chunk {} of {}"
-                            .format(hdf_table, i + 1, n_arrays))
+                logger.info("Inserting %(table)s (chunk %(i)s of %(n)s)",
+                            {'table': hdf_table, 'i': i + 1, 'n': n_arrays})
                 copy_to_database(session, sql_table, columns, fo)
                 del fo
 
         else:
-            logger.info("Creating CSV in memory for {}".format(hdf_table))
+            logger.info("Creating CSV in memory for %s", hdf_table)
             fo = create_file_object(df)
             del df
 
-            logger.info("Inserting {} data".format(hdf_table))
+            logger.info("Inserting %s data", hdf_table)
             copy_to_database(session, sql_table, columns, fo)
             del fo
 
     # Adding keys back` to table
-    logger.info("Recreating {} primary key".format(sql_table))
+    logger.info("Recreating %s primary key", sql_table)
     session.execute(AddConstraint(pk))
 
     if commit_every:
@@ -118,15 +117,15 @@ def copy_to_postgres(sql_table, session, sql_to_hdf, file_name, levels,
     return rows
 
 
-def load_postgres(file_name="./data.h5", chunksize=10**6, keys=None,
-                  commit_every=True):
+def hdf_to_postgres(file_name="./data.h5", chunksize=10**6, keys=None,
+                    commit_every=True):
     '''
     Copy a HDF file to a postgres database
 
     Parameters
     ----------
     file_name: str
-        path to a HDF file to copy to database
+        path to a HDFfile to copy to database
     chunksize: int
         max number of rows to read/copy in any transaction
     keys: iterable
@@ -151,16 +150,11 @@ def load_postgres(file_name="./data.h5", chunksize=10**6, keys=None,
             session.execute(DropConstraint(fk))
         db_foreign_keys += fks
 
-    with Pool(4) as p:
+    rows = 0
 
-        args = [(sql_table, session, sql_to_hdf, file_name, levels,
-                 chunksize, commit_every)
-                for sql_table in sql_to_hdf.keys()]
-
-        logger.info("Mapping copy functions")
-        rows = p.imap(copy_to_postgres, args)
-
-    rows = sum(rows)
+    for sql_table in sql_to_hdf.keys():
+        rows += copy_to_postgres(sql_table, session, sql_to_hdf, file_name,
+                                 levels, chunksize, commit_every)
 
     # Add foreign keys back in after all data loaded to not worry about order
     logger.info("Recreating foreign keys on all tables")

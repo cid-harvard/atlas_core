@@ -2,7 +2,16 @@ import pandas as pd
 
 from collections import defaultdict
 from io import StringIO
-from . import logger
+import logging
+
+# Add new formatted log handler for data_import
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(levelname)s %(asctime)s.%(msecs)03d %(message)s",
+    datefmt="%Y-%m-%d,%H:%M:%S"
+)
+
+logger = logging.getLogger('data_import')
 
 
 def create_file_object(df):
