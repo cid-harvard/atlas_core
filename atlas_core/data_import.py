@@ -35,11 +35,11 @@ def copy_to_database(session, table, columns, file_object):
 
 
 # Tried using this to update constant fields for a data set, but much slower
-def update_level_fields(db, sql_table, levels):
+def update_level_fields(db, hdf_table, sql_table, levels):
     table_obj = db.metadata.tables[sql_table]
     update_obj = table_obj.update()
 
-    for level, value in levels.get(sql_table).items():
+    for level, value in levels.get(hdf_table).items():
         col_name = level + "_level"
         update_obj = update_obj.values({col_name: value})\
                                .where(table_obj.c[col_name].is_(None))
@@ -197,8 +197,8 @@ def copy_to_postgres(session, sql_table, sql_to_hdf, file_name, levels,
         # Tried using UPDATE here but much slower than including in COPY
         if levels.get(sql_table):
             logger.info("Updating {} level fields".format(hdf_table))
-            for entity, level_value in levels.get(sql_table).items():
-                df[entity+"_level"] = level_value
+            for entity, level_value in levels.get(hdf_table).items():
+                df[entity + "_level"] = level_value
 
         columns = df.columns
 
@@ -271,7 +271,7 @@ def import_data_postgres(file_name="./data.h5", chunksize=10**6, keys=None,
             continue
 
         # Get levels for tables to use for later
-        levels[metadata['sql_table_name']] = metadata['levels']
+        levels[key] = metadata['levels']
 
         sql_name = metadata.get("sql_table_name")
         if sql_name:
