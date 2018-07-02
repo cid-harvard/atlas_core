@@ -203,7 +203,7 @@ def copy_to_postgres(session, sql_table, sql_to_hdf, file_name, levels,
         columns = df.columns
 
         # Convert fields that should be int to object fields
-        df = handle_pandas_ints(df, table_obj)
+        df = cast_pandas(df, table_obj)
 
         # Break large dataframes into managable chunks
         if len(df) > chunksize:
@@ -231,7 +231,7 @@ def copy_to_postgres(session, sql_table, sql_to_hdf, file_name, levels,
             copy_to_database(session, sql_table, columns, fo)
             del fo
 
-    # Adding keys back to table
+    # Adding keys back` to table
     logger.info("Recreating {} primary key".format(sql_table))
     session.execute(AddConstraint(pk))
 
@@ -242,7 +242,8 @@ def copy_to_postgres(session, sql_table, sql_to_hdf, file_name, levels,
     return rows
 
 
-def import_data_postgres(file_name="./data.h5", chunksize=10**6, keys=None):
+def import_data_postgres(file_name="./data.h5", chunksize=10**6, keys=None,
+                         commit_every=True):
 
     # Keeping this import inlined to avoid a dependency unless needed
     import pandas as pd
@@ -252,7 +253,6 @@ def import_data_postgres(file_name="./data.h5", chunksize=10**6, keys=None):
     logger.info("Updating database settings")
     # Up maintenance working memory for handling indexing, foreign keys, etc.
     session.execute("SET maintenance_work_mem TO 1000000;")
-    logger.info("Committed maintenance_work_mem")
 
     logger.info("Reading from file:'{}'".format(file_name))
     store = pd.HDFStore(file_name, mode="r")
@@ -293,17 +293,15 @@ def import_data_postgres(file_name="./data.h5", chunksize=10**6, keys=None):
 
     rows = 0
 
-    try:
-        for sql_table in sql_to_hdf.keys():
-            logger.info("Entering copy_to_postgres function")
-            rows += copy_to_postgres(session, sql_table, sql_to_hdf, file_name,
-                                     levels, chunksize)
-    except SQLAlchemyError as exc:
-            logger.error(exc)
-    finally:
-        # Add foreign keys back in after all data loaded to not worry about order
-        for fk in db_foreign_keys:
-            session.execute(AddConstraint(fk))
+    for sql_table in sql_to_hdf.keys():
+        logger.info("Entering copy_to_postgres function")
+        rows += copy_to_postgres(session, sql_table, sql_to_hdf, file_name,
+                                 levels, chunksize, commit_every)
+
+    # Add foreign keys back in after all data loaded to not worry about order
+    logger.info("Recreating foreign keys on all tables")
+    for fk in db_foreign_keys:
+        session.execute(AddConstraint(fk))
 
     # Set this back to default value
     session.execute("SET maintenance_work_mem TO 259000;")
