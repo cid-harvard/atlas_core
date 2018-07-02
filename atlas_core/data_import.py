@@ -238,6 +238,7 @@ def copy_to_postgres(session, sql_table, sql_to_hdf, file_name, levels,
     if commit_every:
         logger.info("Committing transaction.")
         session.commit()
+        session.execute("SET maintenance_work_mem TO 1000000;")
 
     return rows
 
@@ -250,8 +251,6 @@ def import_data_postgres(file_name="./data.h5", chunksize=10**6, keys=None,
 
     session = db.session
 
-    logger.info("Updating database settings")
-    # Up maintenance working memory for handling indexing, foreign keys, etc.
     session.execute("SET maintenance_work_mem TO 1000000;")
 
     logger.info("Reading from file:'{}'".format(file_name))
@@ -300,11 +299,11 @@ def import_data_postgres(file_name="./data.h5", chunksize=10**6, keys=None,
 
     # Add foreign keys back in after all data loaded to not worry about order
     logger.info("Recreating foreign keys on all tables")
+    session.execute("SET maintenance_work_mem TO 1000000;")
     for fk in db_foreign_keys:
         session.execute(AddConstraint(fk))
 
     # Set this back to default value
-    session.execute("SET maintenance_work_mem TO 259000;")
     session.commit()
     logger.info("Job complete. {} rows copied to db.".format(rows))
 
