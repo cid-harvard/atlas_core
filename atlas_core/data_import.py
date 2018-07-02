@@ -157,7 +157,8 @@ def import_data_sqlite(file_name="./data.h5", engine=None,
             print(exc)
 
 
-def copy_to_postgres(session, sql_table, sql_to_hdf, file_name, levels, chunksize):
+def copy_to_postgres(session, sql_table, sql_to_hdf, file_name, levels,
+                     chunksize, commit_every):
 
     import pandas as pd
     import numpy as np
@@ -233,7 +234,10 @@ def copy_to_postgres(session, sql_table, sql_to_hdf, file_name, levels, chunksiz
     # Adding keys back to table
     logger.info("Recreating {} primary key".format(sql_table))
     session.execute(AddConstraint(pk))
-    session.commit()
+
+    if commit_every:
+        logger.info("Committing transaction.")
+        session.commit()
 
     return rows
 
