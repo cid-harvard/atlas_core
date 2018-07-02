@@ -49,11 +49,16 @@ def update_level_fields(db, sql_table, levels):
 
 # Convert fields that should be ints in the db to pandas object fields since
 # pandas ints cannot handle NaN. np.NaN is also not comparable, hence the str
-def handle_pandas_ints(df, table_obj):
+def cast_pandas(df, table_obj):
     for col in table_obj.columns:
-        if str(col.type) == 'INTEGER':
+        if str(col.type) in ['INTEGER', 'BIGINT']:
             df[col.name] = df[col.name].apply(
                 lambda x: None if str(x) == 'nan' else int(x),
+                convert_dtype=False
+            )
+        elif str(col.type) == 'BOOLEAN':
+            df[col.name] = df[col.name].apply(
+                lambda x: None if str(x) == 'nan' else bool(x),
                 convert_dtype=False
             )
 
