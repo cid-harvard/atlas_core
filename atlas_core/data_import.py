@@ -47,6 +47,19 @@ def update_level_fields(db, sql_table, levels):
     return update_obj
 
 
+# Convert fields that should be ints in the db to pandas object fields since
+# pandas ints cannot handle NaN. np.NaN is also not comparable, hence the str
+def handle_pandas_ints(df, table_obj):
+    for col in table_obj.columns:
+        if str(col.type) == 'INTEGER':
+            df[col.name] = df[col.name].apply(
+                lambda x: None if str(x) == 'nan' else int(x),
+                convert_dtype=False
+            )
+
+    return df
+
+
 def classification_to_pandas(df, optional_fields=["name_es", "name_short_en",
                                                   "name_short_es",
                                                   "description_en",
@@ -115,7 +128,6 @@ def import_data_sqlite(file_name="./data.h5", engine=None,
                           chunksize=dest_chunksize, if_exists="append")
 
             else:
-
                 # If it's a timeseries data table, load it in chunks to not
                 # exhaust memory all at once
                 iterator = pd.read_hdf(file_name, key=key,
@@ -145,9 +157,11 @@ def copy_to_postgres(session, sql_table, sql_to_hdf, file_name, levels, chunksiz
     import pandas as pd
     import numpy as np
 
+    table_obj = db.metadata.tables[sql_table]
+
     # Drop PK for table
     logger.info("Dropping {} primary key".format(sql_table))
-    pk = db.metadata.tables[sql_table].primary_key
+    pk = table_obj.primary_key
     session.execute(DropConstraint(pk))
 
     # Truncate SQL table
@@ -182,35 +196,34 @@ def copy_to_postgres(session, sql_table, sql_to_hdf, file_name, levels, chunksiz
 
         columns = df.columns
 
-        try:
-            # Break large dataframes into managable chunks
-            if len(df) > chunksize:
-                n_arrays = (len(df) // chunksize) + 1
-                split_dfs = np.array_split(df, n_arrays)
-                del df
+        # Convert fields that should be int to object fields
+        df = handle_pandas_ints(df, table_obj)
 
-                for i, split_df in enumerate(split_dfs):
-                    logger.info("Creating CSV in memory for {} chunk {} of {}"
-                          .format(hdf_table, i + 1, n_arrays))
-                    fo = create_file_object(split_df)
-                    del split_df
+        # Break large dataframes into managable chunks
+        if len(df) > chunksize:
+            n_arrays = (len(df) // chunksize) + 1
+            split_dfs = np.array_split(df, n_arrays)
+            del df
 
-                    logger.info("Inserting {} chunk {} of {}"
-                          .format(hdf_table, i + 1, n_arrays))
-                    copy_to_database(session, sql_table, columns, fo)
-                    del fo
+            for i, split_df in enumerate(split_dfs):
+                logger.info("Creating CSV in memory for {} chunk {} of {}"
+                            .format(hdf_table, i + 1, n_arrays))
+                fo = create_file_object(split_df)
+                del split_df
 
-            else:
-                logger.info("Creating CSV in memory for {}".format(hdf_table))
-                fo = create_file_object(df)
-                del df
-
-                logger.info("Inserting {} data".format(hdf_table))
+                logger.info("Inserting {} chunk {} of {}"
+                            .format(hdf_table, i + 1, n_arrays))
                 copy_to_database(session, sql_table, columns, fo)
                 del fo
 
-        except SQLAlchemyError as exc:
-            logger.error(exc)
+        else:
+            logger.info("Creating CSV in memory for {}".format(hdf_table))
+            fo = create_file_object(df)
+            del df
+
+            logger.info("Inserting {} data".format(hdf_table))
+            copy_to_database(session, sql_table, columns, fo)
+            del fo
 
     # Adding keys back to table
     logger.info("Recreating {} primary key".format(sql_table))
@@ -271,14 +284,17 @@ def import_data_postgres(file_name="./data.h5", chunksize=10**6, keys=None):
 
     rows = 0
 
-    for sql_table in sql_to_hdf.keys():
-        logger.info("Entering copy_to_postgres function")
-        rows += copy_to_postgres(session, sql_table, sql_to_hdf, file_name,
-                                 levels, chunksize)
-
-    # Add foreign keys back in after all data loaded to not worry about order
-    for fk in db_foreign_keys:
-        session.execute(AddConstraint(fk))
+    try:
+        for sql_table in sql_to_hdf.keys():
+            logger.info("Entering copy_to_postgres function")
+            rows += copy_to_postgres(session, sql_table, sql_to_hdf, file_name,
+                                     levels, chunksize)
+    except SQLAlchemyError as exc:
+            logger.error(exc)
+    finally:
+        # Add foreign keys back in after all data loaded to not worry about order
+        for fk in db_foreign_keys:
+            session.execute(AddConstraint(fk))
 
     # Set this back to default value
     session.execute("SET maintenance_work_mem TO 259000;")
