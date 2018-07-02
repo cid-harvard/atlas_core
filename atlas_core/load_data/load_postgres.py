@@ -5,8 +5,6 @@ from atlas_core import db
 import pandas as pd
 import numpy as np
 
-from multiprocessing import Pool
-
 from sqlalchemy.schema import AddConstraint, DropConstraint
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.engine import reflection
@@ -39,12 +37,12 @@ def copy_to_postgres(sql_table, session, sql_to_hdf, file_name, levels,
     table_obj = db.metadata.tables[sql_table]
 
     # Drop PK for table
-    logger.info("Dropping {} primary key".format(sql_table))
+    logger.info("Dropping %s primary key", sql_table)
     pk = table_obj.primary_key
     session.execute(DropConstraint(pk))
 
     # Truncate SQL table
-    logger.info("Truncating {}".format(sql_table))
+    logger.info("Truncating %s", sql_table)
     session.execute('TRUNCATE TABLE {};'.format(sql_table))
 
     # Copy all HDF tables related to SQL table
@@ -53,23 +51,23 @@ def copy_to_postgres(sql_table, session, sql_to_hdf, file_name, levels,
     rows = 0
 
     if hdf_tables is None:
-        logger.info("No HDF table found for SQL table {}".format(sql_table))
+        logger.info("No HDF table found for SQL table %s", sql_table)
         return rows
 
     for hdf_table in hdf_tables:
-        logger.info("Reading HDF table {}".format(hdf_table))
+        logger.info("Reading HDF table %s", hdf_table)
         df = pd.read_hdf(file_name, key=hdf_table)
         rows += len(df)
 
         # Handle classifications differently
         if hdf_table.startswith("/classifications/"):
-            logger.info("Formatting classification {}".format(hdf_table))
+            logger.info("Formatting classification %s", hdf_table)
             df = classification_to_pandas(df)
 
         # Add columns from level metadata to df
         # Tried using UPDATE here but much slower than including in COPY
         if levels.get(sql_table):
-            logger.info("Updating {} level fields".format(hdf_table))
+            logger.info("Updating %s level fields", hdf_table)
             for entity, level_value in levels.get(hdf_table).items():
                 df[entity + "_level"] = level_value
 
@@ -164,4 +162,4 @@ def hdf_to_postgres(file_name="./data.h5", chunksize=10**6, keys=None,
 
     # Set this back to default value
     session.commit()
-    logger.info("Job complete. {} rows copied to db.".format(rows))
+    logger.info("Job complete. %s rows copied to db.", rows)

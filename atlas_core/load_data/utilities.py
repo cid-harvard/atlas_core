@@ -126,9 +126,9 @@ def hdf_metadata(file_name, keys):
     for key in keys:
         try:
             metadata = store.get_storer(key).attrs.atlas_metadata
-            logger.info("Metadata: {}".format(metadata))
+            logger.info("Metadata: %s", metadata)
         except AttributeError:
-            logger.info("Skipping {}".format(key))
+            logger.info("Attribute Error: Skipping %s", key)
             continue
 
         # Get levels for tables to use for later
@@ -138,7 +138,7 @@ def hdf_metadata(file_name, keys):
         if sql_name:
             sql_to_hdf[sql_name].append(key)
         else:
-            logger.warn("No SQL table name found for {}".format(key))
+            logger.warn("No SQL table name found for %s", key)
 
     store.close()
 
