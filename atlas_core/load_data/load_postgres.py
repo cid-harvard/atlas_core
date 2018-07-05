@@ -1,5 +1,5 @@
 from .utilities import create_file_object, cast_pandas, logger,\
-                       classification_to_pandas, hdf_metadata
+                       classification_to_pandas, hdf_metadata, df_generator
 from atlas_core import db
 
 import pandas as pd
@@ -30,6 +30,31 @@ def update_level_fields(db, hdf_table, sql_table, levels):
     return update_obj
 
 
+def drop_foreign_keys(session):
+    '''
+    Drop all foreign keys in a database.
+
+    Parameters
+    ----------
+    session: SQLAlchemy db session
+
+    Returns
+    -------
+    db_foreign_keys: list of ForeignKeyConstraint
+        usable to iterate over to recreate keys after COPYing data
+    '''
+
+    insp = reflection.Inspector.from_engine(db.engine)
+    db_foreign_keys = []
+    for sql_table in insp.get_table_names():
+        fks = db.metadata.tables[sql_table].foreign_key_constraints
+        for fk in fks:
+            session.execute(DropConstraint(fk))
+        db_foreign_keys += fks
+
+    return db_foreign_keys
+
+
 def copy_to_postgres(sql_table, session, sql_to_hdf, file_name, levels,
                      chunksize, commit_every):
     '''Copy all HDF tables relating to a single SQL table to database'''
@@ -55,55 +80,92 @@ def copy_to_postgres(sql_table, session, sql_to_hdf, file_name, levels,
         return rows
 
     for hdf_table in hdf_tables:
-        logger.info("Reading HDF table %s", hdf_table)
-        df = pd.read_hdf(file_name, key=hdf_table)
-        rows += len(df)
+        logger.info("*** %s ***", hdf_table)
 
         # Handle classifications differently
         if hdf_table.startswith("/classifications/"):
-            logger.info("Formatting classification %s", hdf_table)
+            logger.info("Reading HDF table")
+            df = pd.read_hdf(file_name, key=hdf_table)
+            rows += len(df)
+
+            logger.info("Formatting classification")
             df = classification_to_pandas(df)
 
-        # Add columns from level metadata to df
-        # Tried using UPDATE here but much slower than including in COPY
-        if levels.get(sql_table):
-            logger.info("Updating %s level fields", hdf_table)
-            for entity, level_value in levels.get(hdf_table).items():
-                df[entity + "_level"] = level_value
+            # Convert fields that should be int to object fields
+            df = cast_pandas(df, table_obj)
 
-        columns = df.columns
+            logger.info("Creating CSV in memory")
+            fo = create_file_object(df)
 
-        # Convert fields that should be int to object fields
-        df = cast_pandas(df, table_obj)
-
-        # Break large dataframes into managable chunks
-        if len(df) > chunksize:
-            n_arrays = (len(df) // chunksize) + 1
-            split_dfs = np.array_split(df, n_arrays)
+            logger.info("Copying table to database")
+            copy_to_database(session, sql_table, df.columns, fo)
             del df
+            del fo
 
-            for i, split_df in enumerate(split_dfs):
-                logger.info(("Creating CSV in memory for %(table)s "
-                             "(chunk %(i)s of %(n)s)"),
-                            {'table': hdf_table, 'i': i + 1, 'n': n_arrays})
-                fo = create_file_object(split_df)
-                del split_df
+        # Read partner HDF tables as iterators to conserve memory
+        elif 'partner' in hdf_table:
+            hdf_levels = levels.get(hdf_table)
 
-                logger.info("Inserting %(table)s (chunk %(i)s of %(n)s)",
-                            {'table': hdf_table, 'i': i + 1, 'n': n_arrays})
+            logger.info("Reading HDF table %s", hdf_table)
+            iterator = pd.read_hdf(file_name, key=hdf_table,
+                                   chunksize=chunksize, iterator=True)
+
+            n_chunks = (iterator.nrows // chunksize) + 1
+
+            for i, df in enumerate(iterator):
+                logger.info("*** Chunk %(i)s of %(n)s ***",
+                            {'table': hdf_table, 'i': i + 1, 'n': n_chunks})
+                rows += len(df)
+
+                # Add columns from level metadata to df
+                if hdf_levels:
+                    logger.info("Adding level metadata values")
+                    for entity, level_value in hdf_levels.items():
+                        df[entity + "_level"] = level_value
+
+                # Convert fields that should be int to object fields
+                df = cast_pandas(df, table_obj)
+                columns = df.columns
+
+                logger.info("Creating CSV in memory")
+                fo = create_file_object(df)
+                del df
+
+                logger.info("Copying table to database")
                 copy_to_database(session, sql_table, columns, fo)
                 del fo
 
         else:
-            logger.info("Creating CSV in memory for %s", hdf_table)
-            fo = create_file_object(df)
-            del df
+            hdf_levels = levels.get(hdf_table)
 
-            logger.info("Inserting %s data", hdf_table)
-            copy_to_database(session, sql_table, columns, fo)
-            del fo
+            logger.info("Reading HDF table")
+            df = pd.read_hdf(file_name, key=hdf_table)
+            rows += len(df)
 
-    # Adding keys back` to table
+            # Convert fields that should be int to object fields
+            df = cast_pandas(df, table_obj)
+
+            # Add columns from level metadata to df
+            if hdf_levels:
+                logger.info("Adding level metadata values")
+                for entity, level_value in hdf_levels.items():
+                    df[entity + "_level"] = level_value
+
+            # Split dataframe before creating StringIO objects in memory
+            columns = df.columns
+
+            for chunk in df_generator(df, chunksize, logger=logger):
+
+                logger.info("Creating CSV in memory")
+                fo = create_file_object(chunk)
+
+                logger.info("Copying chunk to database")
+                copy_to_database(session, sql_table, columns, fo)
+                del fo
+
+    logger.info("All chunks copied (%s rows)", rows)
+
+    # Adding keys back to table
     logger.info("Recreating %s primary key", sql_table)
     session.execute(AddConstraint(pk))
 
@@ -140,13 +202,7 @@ def hdf_to_postgres(file_name="./data.h5", chunksize=10**6, keys=None,
 
     # Drop all foreign keys first to allow for dropping PKs after
     logger.info("Dropping foreign keys for all tables")
-    insp = reflection.Inspector.from_engine(db.engine)
-    db_foreign_keys = []
-    for sql_table in insp.get_table_names():
-        fks = db.metadata.tables[sql_table].foreign_key_constraints
-        for fk in fks:
-            session.execute(DropConstraint(fk))
-        db_foreign_keys += fks
+    db_foreign_keys = drop_foreign_keys(session)
 
     rows = 0
 
@@ -156,10 +212,10 @@ def hdf_to_postgres(file_name="./data.h5", chunksize=10**6, keys=None,
 
     # Add foreign keys back in after all data loaded to not worry about order
     logger.info("Recreating foreign keys on all tables")
-    session.execute("SET maintenance_work_mem TO 1000000;")
     for fk in db_foreign_keys:
+        session.execute("SET maintenance_work_mem TO 1000000;")
         session.execute(AddConstraint(fk))
+        session.commit()
 
     # Set this back to default value
-    session.commit()
     logger.info("Job complete. %s rows copied to db.", rows)
