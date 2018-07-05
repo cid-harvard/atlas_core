@@ -1,8 +1,9 @@
+import logging
 import pandas as pd
 
 from collections import defaultdict
 from io import StringIO
-import logging
+
 
 # Add new formatted log handler for data_import
 logging.basicConfig(
@@ -25,7 +26,29 @@ def create_file_object(df):
     return file_object
 
 
-def cast_pandas(df, table_obj):
+def df_generator(df, chunksize, logger=None):
+    '''
+    Create a generator to iterate over chunks of a dataframe
+
+    Parameters
+    ----------
+    df: pandas dataframe
+        dataframe to iterate over
+    chunksize: int
+        max number of rows to return in a chunk
+    '''
+    rows = 0
+    n_chunks = (df.shape[0] // chunksize) + 1
+
+    for i in range(n_chunks):
+        if logger:
+            logger.info("** Chunk %(i)s of %(n)s **",
+                        {'i': i + 1, 'n': n_chunks})
+        yield df.iloc[rows:rows+chunksize]
+        rows += chunksize
+
+
+def cast_pandas(df, sql_table):
     '''
     Pandas does not handle null values in integer or boolean fields out of the
     box, so cast fields that should be these types in the database to object
@@ -37,7 +60,7 @@ def cast_pandas(df, table_obj):
         data frame with fields that are desired to be int or bool as float with
         np.nan that should correspond to None
 
-    table_obj: SQLAlchemy model instance
+    sql_table: SQLAlchemy model
         destination table object with field names corresponding to those in df
 
     Returns
@@ -47,7 +70,7 @@ def cast_pandas(df, table_obj):
         fields changed to objects with None values for null
     '''
 
-    for col in table_obj.columns:
+    for col in sql_table.columns:
         if str(col.type) in ['INTEGER', 'BIGINT']:
             df[col.name] = df[col.name].apply(
                 # np.nan are not comparable, so use str value
