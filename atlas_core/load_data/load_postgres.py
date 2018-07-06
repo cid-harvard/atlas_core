@@ -21,6 +21,19 @@ def rollback(session):
 
 
 def copy_to_database(session, table, columns, file_object):
+    '''
+    Copy data to Postgres table using COPY command
+
+    Parameters
+    ----------
+    session: SQLAlchemy session
+    table: str
+        destination SQL table name to copy to
+    columns: list of str
+        list of columns in table corresponding to data in file
+    file_object: StringIO
+        in-memory csv file to use to copy from
+    '''
     cur = session.connection().connection.cursor()
     columns = ', '.join([f'{col}' for col in columns])
     sql = f'COPY {table} ({columns}) FROM STDIN WITH CSV HEADER FREEZE'
@@ -41,6 +54,16 @@ def update_level_fields(db, hdf_table, sql_table, levels):
 
 
 def chunk_copy_df(session, df, sql_table, chunksize):
+    '''
+    Copy pandas dataframe to postgres table in iterative chunks
+
+    Parameters
+    ----------
+    session: SQLAlchemy session
+    df: pandas dataframe
+    sql_table: str
+    chunksize: int
+    '''
     logger.info("Creating generator for chunking dataframe")
     for chunk in df_generator(df, chunksize, logger=logger):
 
