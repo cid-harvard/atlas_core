@@ -7,7 +7,16 @@ import pandas as pd
 
 from sqlalchemy.schema import AddConstraint, DropConstraint
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.engine import reflection
+from multiprocessing import Pool
+
+
+def make_session():
+    db.engine.dispose()
+    session = sessionmaker(db.engine)
+    s_session = scoped_session(session)()
+    return s_session
 
 
 def commit(session):
@@ -65,7 +74,7 @@ def chunk_copy_df(session, df, sql_table, dest_chunksize):
     dest_chunksize: int
     '''
     logger.info("Creating generator for chunking dataframe")
-    for chunk in df_generator(df, dest_chunksize, logger=logger):
+    for chunk in df_generator(df, dest_chunksize):
 
         logger.info("Creating CSV in memory")
         fo = create_file_object(chunk)
@@ -108,9 +117,11 @@ def drop_foreign_keys(session):
     return db_foreign_keys
 
 
-def copy_to_postgres(sql_table, session, sql_to_hdf, file_name, levels,
+def copy_to_postgres(sql_table, sql_to_hdf, file_name, levels,
                      source_chunksize, dest_chunksize, commit_every):
     '''Copy all HDF tables relating to a single SQL table to database'''
+
+    session = make_session()
 
     table_obj = db.metadata.tables[sql_table]
 
@@ -137,7 +148,7 @@ def copy_to_postgres(sql_table, session, sql_to_hdf, file_name, levels,
         hdf_levels = levels.get(hdf_table)
 
         # Handle classifications formatting differently and read all at once
-        if hdf_table.startswith("/classifications/"):
+        if "classifications/" in hdf_table:
             logger.info("Reading HDF table")
             df = pd.read_hdf(file_name, key=hdf_table)
             rows += len(df)
@@ -211,7 +222,7 @@ def copy_to_postgres(sql_table, session, sql_to_hdf, file_name, levels,
         logger.info("Committing transaction.")
         commit(session)
 
-    return rows
+    session.close()
 
 
 def hdf_to_postgres(file_name="./data.h5", keys=None, source_chunksize=10**7,
@@ -233,7 +244,7 @@ def hdf_to_postgres(file_name="./data.h5", keys=None, source_chunksize=10**7,
         if true, commit after every major transaction (e.g., table COPY)
     '''
 
-    session = db.session
+    session = make_session()
     session.execute("SET maintenance_work_mem TO 1000000;")
 
     logger.info("Compiling needed HDF metadata")
@@ -241,20 +252,25 @@ def hdf_to_postgres(file_name="./data.h5", keys=None, source_chunksize=10**7,
 
     # Drop all foreign keys first to allow for dropping PKs after
     logger.info("Dropping foreign keys for all tables")
-    db_foreign_keys = drop_foreign_keys(session, logger)
+    db_foreign_keys = drop_foreign_keys(session)
 
-    rows = 0
+    session.close()
 
-    for sql_table in sql_to_hdf.keys():
-        rows += copy_to_postgres(sql_table, session, sql_to_hdf, file_name,
-                                 levels, source_chunksize, dest_chunksize,
-                                 commit_every)
+    args = [(sql_table, sql_to_hdf, file_name, levels,
+             source_chunksize, dest_chunksize, commit_every)
+            for sql_table
+            in sql_to_hdf.keys()]
+
+    try:
+        p = Pool(2)
+        p.starmap(copy_to_postgres, args)
+    finally:
+        p.close()
+        p.join()
 
     # Add foreign keys back in after all data loaded to not worry about order
+    session = make_session()
     logger.info("Recreating foreign keys on all tables")
     for fk in db_foreign_keys:
         session.execute(AddConstraint(fk))
         commit(session)
-
-    # Set this back to default value
-    logger.info("Job complete. %s rows copied to db.", rows)
