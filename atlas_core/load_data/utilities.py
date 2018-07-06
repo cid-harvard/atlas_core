@@ -38,7 +38,10 @@ def df_generator(df, chunksize):
         max number of rows to return in a chunk
     '''
     rows = 0
-    n_chunks = (df.shape[0] // chunksize) + 1
+    if df.shape[0] % chunksize:
+        n_chunks = df.shape[0] // chunksize
+    else:
+        n_chunks = (df.shape[0] // chunksize) + 1
 
     for i in range(n_chunks):
         logger.info("Chunk %(i)s/%(n)s", {'i': i + 1, 'n': n_chunks})
