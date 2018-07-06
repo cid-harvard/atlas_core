@@ -26,7 +26,7 @@ def create_file_object(df):
     return file_object
 
 
-def df_generator(df, chunksize, logger=None):
+def df_generator(df, chunksize):
     '''
     Create a generator to iterate over chunks of a dataframe
 
@@ -36,15 +36,12 @@ def df_generator(df, chunksize, logger=None):
         dataframe to iterate over
     chunksize: int
         max number of rows to return in a chunk
-    logger: logging.Logger
     '''
     rows = 0
     n_chunks = (df.shape[0] // chunksize) + 1
 
     for i in range(n_chunks):
-        if logger:
-            logger.info("** Chunk %(i)s of %(n)s **",
-                        {'i': i + 1, 'n': n_chunks})
+        logger.info("Chunk %(i)s/%(n)s", {'i': i + 1, 'n': n_chunks})
         yield df.iloc[rows:rows+chunksize]
         rows += chunksize
 

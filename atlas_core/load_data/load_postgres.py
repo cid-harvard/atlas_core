@@ -74,8 +74,6 @@ def chunk_copy_df(session, df, sql_table, chunksize):
         copy_to_database(session, sql_table, df.columns, fo)
         del fo
 
-        logger.info("Chunk copied successfully")
-
 
 def drop_foreign_keys(session):
     '''
@@ -136,6 +134,7 @@ def copy_to_postgres(sql_table, session, sql_to_hdf, file_name, levels,
 
     for hdf_table in hdf_tables:
         logger.info("*** %s ***", hdf_table)
+        hdf_levels = levels.get(hdf_table)
 
         # Handle classifications formatting differently and read all at once
         if hdf_table.startswith("/classifications/"):
@@ -157,51 +156,50 @@ def copy_to_postgres(sql_table, session, sql_to_hdf, file_name, levels,
             del df
             del fo
 
-        # Read partner HDF tables as iterators to conserve memory
+        # Iterate over HDF table to conserve memory, then copy to postgres
+        # by using a df generator to csv
         elif 'partner' in hdf_table:
-
-            hdf_levels = levels.get(hdf_table)
-
             with pd.HDFStore(file_name) as store:
                 nrows = store.get_storer(hdf_table).nrows
 
-            n_chunks = (nrows // hdf_chunksize) + 1
             rows += nrows
+            if nrows % hdf_chunksize:
+                n_chunks = (nrows // hdf_chunksize) + 1
+            else:
+                n_chunks = nrows // hdf_chunksize
+
+            start = 0
 
             for i in range(n_chunks):
                 logger.info("*** HDF chunk %(i)s of %(n)s ***",
                             {'i': i + 1, 'n': n_chunks})
 
-                start = i * hdf_chunksize
-                stop = min(start + hdf_chunksize, nrows)
-
                 logger.info("Reading HDF table")
+                stop = min(start + hdf_chunksize, nrows)
                 df = pd.read_hdf(file_name, key=hdf_table,
                                  start=start, stop=stop)
 
-                # Convert fields that should be int to object fields
-                df = cast_pandas(df, table_obj)
+                start += hdf_chunksize
 
-                # Add columns from level metadata to df
-                hdf_levels = levels.get(hdf_table)
+                # Handle NaN --> None type casting and adding const level data
+                df = cast_pandas(df, table_obj)
                 df = add_level_metadata(df, hdf_levels)
 
                 chunk_copy_df(session, df, sql_table, chunksize)
+                del df
 
-        # Read entire HDF file, but use generator for iterating chunks to CSV
+        # Read entire HDF file, but copy using a generator to iterate df to csv
         else:
             logger.info("Reading HDF table")
             df = pd.read_hdf(file_name, key=hdf_table)
             rows += len(df)
 
-            # Convert fields that should be int to object fields
+            # Handle NaN --> None type casting and adding const level data
             df = cast_pandas(df, table_obj)
-
-            # Add columns from level metadata to df
-            hdf_levels = levels.get(hdf_table)
             df = add_level_metadata(df, hdf_levels)
 
             chunk_copy_df(session, df, sql_table, chunksize)
+            del df
 
     logger.info("All chunks copied (%s rows)", rows)
 
