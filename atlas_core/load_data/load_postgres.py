@@ -53,7 +53,7 @@ def update_level_fields(db, hdf_table, sql_table, levels):
     return update_obj
 
 
-def chunk_copy_df(session, df, sql_table, chunksize):
+def chunk_copy_df(session, df, sql_table, dest_chunksize):
     '''
     Copy pandas dataframe to postgres table in iterative chunks
 
@@ -62,10 +62,10 @@ def chunk_copy_df(session, df, sql_table, chunksize):
     session: SQLAlchemy session
     df: pandas dataframe
     sql_table: str
-    chunksize: int
+    dest_chunksize: int
     '''
     logger.info("Creating generator for chunking dataframe")
-    for chunk in df_generator(df, chunksize, logger=logger):
+    for chunk in df_generator(df, dest_chunksize, logger=logger):
 
         logger.info("Creating CSV in memory")
         fo = create_file_object(chunk)
@@ -109,7 +109,7 @@ def drop_foreign_keys(session):
 
 
 def copy_to_postgres(sql_table, session, sql_to_hdf, file_name, levels,
-                     chunksize, hdf_chunksize, commit_every):
+                     source_chunksize, dest_chunksize, commit_every):
     '''Copy all HDF tables relating to a single SQL table to database'''
 
     table_obj = db.metadata.tables[sql_table]
@@ -163,10 +163,10 @@ def copy_to_postgres(sql_table, session, sql_to_hdf, file_name, levels,
                 nrows = store.get_storer(hdf_table).nrows
 
             rows += nrows
-            if nrows % hdf_chunksize:
-                n_chunks = (nrows // hdf_chunksize) + 1
+            if nrows % source_chunksize:
+                n_chunks = (nrows // source_chunksize) + 1
             else:
-                n_chunks = nrows // hdf_chunksize
+                n_chunks = nrows // source_chunksize
 
             start = 0
 
@@ -175,17 +175,17 @@ def copy_to_postgres(sql_table, session, sql_to_hdf, file_name, levels,
                             {'i': i + 1, 'n': n_chunks})
 
                 logger.info("Reading HDF table")
-                stop = min(start + hdf_chunksize, nrows)
+                stop = min(start + source_chunksize, nrows)
                 df = pd.read_hdf(file_name, key=hdf_table,
                                  start=start, stop=stop)
 
-                start += hdf_chunksize
+                start += source_chunksize
 
                 # Handle NaN --> None type casting and adding const level data
                 df = cast_pandas(df, table_obj)
                 df = add_level_metadata(df, hdf_levels)
 
-                chunk_copy_df(session, df, sql_table, chunksize)
+                chunk_copy_df(session, df, sql_table, dest_chunksize)
                 del df
 
         # Read entire HDF file, but copy using a generator to iterate df to csv
@@ -198,7 +198,7 @@ def copy_to_postgres(sql_table, session, sql_to_hdf, file_name, levels,
             df = cast_pandas(df, table_obj)
             df = add_level_metadata(df, hdf_levels)
 
-            chunk_copy_df(session, df, sql_table, chunksize)
+            chunk_copy_df(session, df, sql_table, dest_chunksize)
             del df
 
     logger.info("All chunks copied (%s rows)", rows)
@@ -214,8 +214,8 @@ def copy_to_postgres(sql_table, session, sql_to_hdf, file_name, levels,
     return rows
 
 
-def hdf_to_postgres(file_name="./data.h5", keys=None, chunksize=10**6,
-                    hdf_chunksize=10**7, commit_every=True):
+def hdf_to_postgres(file_name="./data.h5", keys=None, source_chunksize=10**7,
+                    dest_chunksize=10**6, commit_every=True):
     '''
     Copy a HDF file to a postgres database
 
@@ -225,10 +225,10 @@ def hdf_to_postgres(file_name="./data.h5", keys=None, chunksize=10**6,
         path to a HDFfile to copy to database
     keys: iterable
         set of keys in HDF to limit load to
-    chunksize: int
-        max number of rows to read/copy in any transaction
-    hdf_chunksize: int
+    source_chunksize: int
         when reading HDF file in chunks, max row count
+    dest_chunksize: int
+        max number of rows to read/copy in any transaction
     commit_every: boolean
         if true, commit after every major transaction (e.g., table COPY)
     '''
@@ -247,7 +247,7 @@ def hdf_to_postgres(file_name="./data.h5", keys=None, chunksize=10**6,
 
     for sql_table in sql_to_hdf.keys():
         rows += copy_to_postgres(sql_table, session, sql_to_hdf, file_name,
-                                 levels, chunksize, hdf_chunksize,
+                                 levels, source_chunksize, dest_chunksize,
                                  commit_every)
 
     # Add foreign keys back in after all data loaded to not worry about order

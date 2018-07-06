@@ -4,8 +4,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from load_data import hdf_to_postgres, classification_to_pandas
 
 
-def import_data_sqlite(file_name="./data.h5", engine=None,
-                       source_chunksize=10**6, dest_chunksize=10**6, keys=None):
+def import_data_sqlite(file_name="./data.h5", engine=None, keys=None,
+                       source_chunksize=10**6, dest_chunksize=10**6):
     # Keeping this import inlined to avoid a dependency unless needed
     import pandas as pd
 
@@ -86,12 +86,9 @@ def import_data(file_name="./data.h5", engine=None, source_chunksize=10**6,
 
     if database == "postgres":
         # No engine defined as a kwarg for postgres
-        hdf_to_postgres(file_name=file_name,
-                        chunksize=min(source_chunksize, dest_chunksize),
-                        keys=keys, commit_every=True)
+        hdf_to_postgres(file_name, keys, source_chunksize, dest_chunksize,
+                        commit_every=True)
 
     elif database == "sqlite":
-        import_data_sqlite(file_name=file_name, engine=engine,
-                           source_chunksize=source_chunksize,
-                           dest_chunksize=dest_chunksize,
-                           keys=keys)
+        import_data_sqlite(file_name, engine, keys, source_chunksize,
+                           dest_chunksize)
