@@ -36,6 +36,7 @@ def df_generator(df, chunksize, logger=None):
         dataframe to iterate over
     chunksize: int
         max number of rows to return in a chunk
+    logger: logging.Logger
     '''
     rows = 0
     n_chunks = (df.shape[0] // chunksize) + 1
@@ -166,3 +167,26 @@ def hdf_metadata(file_name, keys):
     store.close()
 
     return sql_to_hdf, levels
+
+
+def add_level_metadata(df, hdf_levels):
+    '''
+    Updates dataframe fields for constant "_level" fields
+
+    Parameters
+    ----------
+    df: pandas DataFrame
+    hdf_levels: dict
+        dict of level:value fields that are constant for the entire dataframe
+
+    Returns
+    ------
+    df: pandas DataFrame
+    '''
+
+    if hdf_levels:
+        logger.info("Adding level metadata values")
+        for entity, level_value in hdf_levels.items():
+            df[entity + "_level"] = level_value
+
+    return df
