@@ -9,17 +9,17 @@ from io import StringIO
 logging.basicConfig(
     level=logging.DEBUG,
     format="%(levelname)s %(asctime)s.%(msecs)03d %(message)s",
-    datefmt="%Y-%m-%d,%H:%M:%S"
+    datefmt="%Y-%m-%d,%H:%M:%S",
 )
 
-logger = logging.getLogger('data_import')
+logger = logging.getLogger("data_import")
 
 
 def create_file_object(df):
-    '''
+    """
     Writes pandas dataframe to an in-memory StringIO file object. Adapted from
     https://gist.github.com/mangecoeur/1fbd63d4758c2ba0c470#gistcomment-2086007
-    '''
+    """
     file_object = StringIO()
     df.to_csv(file_object, index=False)
     file_object.seek(0)
@@ -27,7 +27,7 @@ def create_file_object(df):
 
 
 def df_generator(df, chunksize):
-    '''
+    """
     Create a generator to iterate over chunks of a dataframe
 
     Parameters
@@ -36,7 +36,7 @@ def df_generator(df, chunksize):
         dataframe to iterate over
     chunksize: int
         max number of rows to return in a chunk
-    '''
+    """
     rows = 0
     if df.shape[0] % chunksize:
         n_chunks = df.shape[0] // chunksize
@@ -44,13 +44,13 @@ def df_generator(df, chunksize):
         n_chunks = (df.shape[0] // chunksize) + 1
 
     for i in range(n_chunks):
-        logger.info("Chunk %(i)s/%(n)s", {'i': i + 1, 'n': n_chunks})
-        yield df.iloc[rows:rows+chunksize]
+        logger.info("Chunk %(i)s/%(n)s", {"i": i + 1, "n": n_chunks})
+        yield df.iloc[rows : rows + chunksize]
         rows += chunksize
 
 
 def cast_pandas(df, sql_table):
-    '''
+    """
     Pandas does not handle null values in integer or boolean fields out of the
     box, so cast fields that should be these types in the database to object
     fields and change np.nan to None
@@ -69,31 +69,35 @@ def cast_pandas(df, sql_table):
     df: pandas dataframe
         dataframe with fields that correspond to Postgres int, bigint, and bool
         fields changed to objects with None values for null
-    '''
+    """
 
     for col in sql_table.columns:
-        if str(col.type) in ['INTEGER', 'BIGINT']:
+        if str(col.type) in ["INTEGER", "BIGINT"]:
             df[col.name] = df[col.name].apply(
                 # np.nan are not comparable, so use str value
-                lambda x: None if str(x) == 'nan' else int(x),
-                convert_dtype=False
+                lambda x: None if str(x) == "nan" else int(x),
+                convert_dtype=False,
             )
-        elif str(col.type) == 'BOOLEAN':
+        elif str(col.type) == "BOOLEAN":
             df[col.name] = df[col.name].apply(
-                lambda x: None if str(x) == 'nan' else bool(x),
-                convert_dtype=False
+                lambda x: None if str(x) == "nan" else bool(x), convert_dtype=False
             )
 
     return df
 
 
-def classification_to_pandas(df, optional_fields=["name_es", "name_short_en",
-                                                  "name_short_es",
-                                                  "description_en",
-                                                  "description_es",
-                                                  "is_trusted",
-                                                  "in_rankings"
-                                                  ]):
+def classification_to_pandas(
+    df,
+    optional_fields=[
+        "name_es",
+        "name_short_en",
+        "name_short_es",
+        "description_en",
+        "description_es",
+        "is_trusted",
+        "in_rankings",
+    ],
+):
     """Convert a classification from the format it comes in the classification
     file (which is the format from the 'classifications' github repository)
     into the format that the flask apps use. Mostly just a thing for dropping
@@ -106,10 +110,7 @@ def classification_to_pandas(df, optional_fields=["name_es", "name_short_en",
 
     # Sort fields and change names appropriately
     new_df = df[["index", "code", "name", "level", "parent_id"]]
-    new_df = new_df.rename(columns={
-        "index": "id",
-        "name": "name_en"
-    })
+    new_df = new_df.rename(columns={"index": "id", "name": "name_en"})
 
     for field in optional_fields:
         if field in df:
@@ -119,7 +120,7 @@ def classification_to_pandas(df, optional_fields=["name_es", "name_short_en",
 
 
 def hdf_metadata(file_name, keys):
-    '''
+    """
     Returns information on SQL-HDF table pairs (one-to-many) and classification
     levels of each HDF table (many-to-one)
 
@@ -139,7 +140,7 @@ def hdf_metadata(file_name, keys):
     levels: dict
         for each key of an HDF table, provides data on the associated levels
         for classification fields (such as 2digit, country)
-    '''
+    """
 
     store = pd.HDFStore(file_name, mode="r")
     keys = keys or store.keys()
@@ -156,7 +157,7 @@ def hdf_metadata(file_name, keys):
             continue
 
         # Get levels for tables to use for later
-        levels[key] = metadata['levels']
+        levels[key] = metadata["levels"]
 
         sql_name = metadata.get("sql_table_name")
         if sql_name:
@@ -170,7 +171,7 @@ def hdf_metadata(file_name, keys):
 
 
 def add_level_metadata(df, hdf_levels):
-    '''
+    """
     Updates dataframe fields for constant "_level" fields
 
     Parameters
@@ -182,7 +183,7 @@ def add_level_metadata(df, hdf_levels):
     Returns
     ------
     df: pandas DataFrame
-    '''
+    """
 
     if hdf_levels:
         logger.info("Adding level metadata values")
