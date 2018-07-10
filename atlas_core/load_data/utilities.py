@@ -38,8 +38,8 @@ def df_generator(df, chunksize):
         max number of rows to return in a chunk
     """
     rows = 0
-    if df.shape[0] % chunksize:
-        n_chunks = df.shape[0] // chunksize
+    if not df.shape[0] % chunksize:
+        n_chunks = max(df.shape[0] // chunksize, 1)
     else:
         n_chunks = (df.shape[0] // chunksize) + 1
 
