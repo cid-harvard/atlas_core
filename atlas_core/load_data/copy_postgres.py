@@ -18,7 +18,7 @@ from sqlalchemy.exc import SQLAlchemyError
 e = db.engine
 
 
-class PGTable(object):
+class PGTableCopier(object):
 
     rows = 0
     columns = None
@@ -77,6 +77,10 @@ class PGTable(object):
         logger.info(f"Truncating {self.sql_table}")
         self.conn.execute(f"TRUNCATE TABLE {self.sql_table};")
 
+    def analyze(self):
+        logger.info(f"Analyzing {self.sql_table}")
+        self.conn.execute(f"ANALYZE {self.sql_table};")
+
     def copy_from_file(self, file_object):
         cur = self.conn.connection.cursor()
         cols = ", ".join([f"{col}" for col in self.columns])
@@ -92,6 +96,7 @@ class PGTable(object):
             self.hdf_to_pg()
             self.create_pk()
             self.create_fks()
+        self.analyze()
 
     def hdf_to_pg(self):
         if self.hdf_tables is None:
@@ -126,9 +131,9 @@ class PGTable(object):
         logger.info(f"All chunks copied ({self.rows} rows)")
 
 
-class PGClassificationTable(PGTable):
+class PGClassificationTableCopier(PGTableCopier):
     def __init__(self, sql_table, hdf_tables, hdf_meta, csv_chunksize=10 ** 6):
-        PGTable.__init__(self, sql_table, hdf_tables, hdf_meta, csv_chunksize)
+        PGTableCopier.__init__(self, sql_table, hdf_tables, hdf_meta, csv_chunksize)
 
     def hdf_to_pg(self):
         if self.hdf_tables is None:
@@ -158,9 +163,9 @@ class PGClassificationTable(PGTable):
         logger.info(f"All chunks copied ({self.rows} rows)")
 
 
-class PGPartnerTable(PGTable):
+class PGPartnerTableCopier(PGTableCopier):
     def __init__(self, sql_table, hdf_tables, hdf_meta, csv_chunksize=10 ** 6):
-        PGTable.__init__(self, sql_table, hdf_tables, hdf_meta, csv_chunksize)
+        PGTableCopier.__init__(self, sql_table, hdf_tables, hdf_meta, csv_chunksize)
 
     def hdf_to_pg(self):
         if self.hdf_tables is None:
@@ -246,14 +251,16 @@ def create_table_objects(hdf_meta, csv_chunksize=10 ** 6):
     for sql_table, hdf_tables in hdf_meta.sql_to_hdf.items():
         if any("classifications/" in table for table in hdf_tables):
             classifications.append(
-                PGClassificationTable(sql_table, hdf_tables, hdf_meta, csv_chunksize)
+                PGClassificationTableCopier(
+                    sql_table, hdf_tables, hdf_meta, csv_chunksize
+                )
             )
         elif any("partner" in table for table in hdf_tables):
             partners.append(
-                PGPartnerTable(sql_table, hdf_tables, hdf_meta, csv_chunksize)
+                PGPartnerTableCopier(sql_table, hdf_tables, hdf_meta, csv_chunksize)
             )
         else:
-            other.append(PGTable(sql_table, hdf_tables, hdf_meta, csv_chunksize))
+            other.append(PGTableCopier(sql_table, hdf_tables, hdf_meta, csv_chunksize))
 
     # Return the objects sorted classifications, then partner, then other
     return classifications, partners + other
