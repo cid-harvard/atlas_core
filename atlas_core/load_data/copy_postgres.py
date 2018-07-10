@@ -2,7 +2,6 @@ from .utilities import (
     create_file_object,
     df_generator,
     logger,
-    hdf_metadata,
     classification_to_pandas,
     cast_pandas,
     add_level_metadata,
@@ -15,9 +14,8 @@ from collections import defaultdict
 from multiprocessing import Pool
 from sqlalchemy.schema import AddConstraint, DropConstraint
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import scoped_session, sessionmaker
 
-Session = sessionmaker(bind=db.engine, autocommit=True)
+e = db.engine
 
 
 class PGTable(object):
@@ -35,37 +33,35 @@ class PGTable(object):
         self.file_name = hdf_meta.file_name
         self.hdf_chunksize = hdf_meta.chunksize
 
-        self.table_metadata()
-
     def table_metadata(self):
         self.table_obj = db.metadata.tables[self.sql_table]
         self.primary_key = self.table_obj.primary_key
         self.foreign_keys = self.table_obj.foreign_key_constraints
 
-    def set_session(self, session):
-        self.session = session
+    def set_conn(self, conn):
+        self.conn = conn
 
-    def delete_session(self):
-        del self.session
+    def delete_conn(self):
+        del self.conn
 
     def drop_pk(self):
         logger.info(f"Dropping {self.sql_table} primary key")
         try:
-            with self.session.begin_nested():
-                self.session.execute(DropConstraint(self.primary_key, cascade=True))
+            with self.conn.begin_nested():
+                self.conn.execute(DropConstraint(self.primary_key, cascade=True))
         except SQLAlchemyError:
             logger.info(f"{self.sql_table} primary key not found. Skipping")
 
     def create_pk(self):
         logger.info(f"Creating {self.sql_table} primary key")
-        self.session.execute(AddConstraint(self.primary_key))
+        self.conn.execute(AddConstraint(self.primary_key))
 
     def drop_fks(self):
         for fk in self.foreign_keys:
             logger.info(f"Dropping foreign key {fk.name}")
             try:
-                with self.session.begin_nested():
-                    self.session.execute(DropConstraint(fk))
+                with self.conn.begin_nested():
+                    self.conn.execute(DropConstraint(fk))
             except SQLAlchemyError:
                 logger.warn(f"Foreign key {fk.name} not found")
 
@@ -73,27 +69,29 @@ class PGTable(object):
         for fk in self.foreign_keys:
             try:
                 logger.info(f"Creating foreign key {fk.name}")
-                self.session.execute(AddConstraint(fk))
+                self.conn.execute(AddConstraint(fk))
             except SQLAlchemyError:
                 logger.warn(f"Error creating foreign key {fk.name}")
 
     def truncate(self):
         logger.info(f"Truncating {self.sql_table}")
-        self.session.execute(f"TRUNCATE TABLE {self.sql_table};")
+        self.conn.execute(f"TRUNCATE TABLE {self.sql_table};")
 
     def copy_from_file(self, file_object):
-        cur = self.session.connection().connection.cursor()
+        cur = self.conn.connection.cursor()
         cols = ", ".join([f"{col}" for col in self.columns])
         sql = f"COPY {self.sql_table} ({cols}) FROM STDIN WITH CSV HEADER FREEZE"
         cur.copy_expert(sql=sql, file=file_object)
 
     def copy_table(self):
+        self.table_metadata()
         self.drop_fks()
         self.drop_pk()
-        self.truncate()
-        self.hdf_to_pg()
-        self.create_pk()
-        # self.create_fks()
+        with self.conn.begin():
+            self.truncate()
+            self.hdf_to_pg()
+            self.create_pk()
+            self.create_fks()
 
     def hdf_to_pg(self):
         if self.hdf_tables is None:
@@ -262,15 +260,13 @@ def create_table_objects(hdf_meta, csv_chunksize=10 ** 6):
 
 
 def copy_worker(table_obj):
-    session = Session()
-
-    with session.begin():
-        session.execute("SET maintenance_work_mem TO 1000000;")
-        table_obj.set_session(session)
+    e.dispose()
+    with e.connect() as conn:
+        conn.execution_options(autocommit=True)
+        conn.execute("SET maintenance_work_mem TO 1000000;")
+        table_obj.set_conn(conn)
         table_obj.copy_table()
-        table_obj.delete_session()
-
-    session.close()
+        table_obj.delete_conn()
 
 
 def hdf_to_postgres(
@@ -284,10 +280,8 @@ def hdf_to_postgres(
         copy_worker(ct)
 
     try:
-        n_threads = 3
-        logger.info(f"Initiating pool with {n_threads} processes")
-        p = Pool(n_threads)
-        p.map(copy_worker, tables)
+        p = Pool(4)
+        p.imap(copy_worker, tables, chunksize=1)
     finally:
         p.close()
         p.join()
