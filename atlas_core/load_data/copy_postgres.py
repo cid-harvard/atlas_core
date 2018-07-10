@@ -12,9 +12,12 @@ from atlas_core import db
 
 import pandas as pd
 from collections import defaultdict
+from multiprocessing import Pool
 from sqlalchemy.schema import AddConstraint, DropConstraint
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import scoped_session, sessionmaker
+
+Session = sessionmaker(bind=db.engine, autocommit=True)
 
 
 class PGTable(object):
@@ -22,69 +25,57 @@ class PGTable(object):
     rows = 0
     columns = None
 
-    def __init__(self, database, sql_table, hdf_tables, hdf, csv_chunksize=10 ** 6):
-        self.db = database
-        self.make_session()
-
+    def __init__(self, sql_table, hdf_tables, hdf_meta, csv_chunksize=10 ** 6):
         self.sql_table = sql_table
         self.hdf_tables = hdf_tables
-        self.table_obj = self.db.metadata.tables[sql_table]
-        self.primary_key = self.table_obj.primary_key
-        self.foreign_keys = self.table_obj.foreign_key_constraints
         self.csv_chunksize = csv_chunksize
 
         # Info from the HDFMetadata object
-        self.levels = hdf.levels
-        self.file_name = hdf.file_name
-        self.hdf_chunksize = hdf.chunksize
+        self.levels = hdf_meta.levels
+        self.file_name = hdf_meta.file_name
+        self.hdf_chunksize = hdf_meta.chunksize
 
-    def make_session(self):
-        self.db.engine.dispose()
-        self.session = scoped_session(sessionmaker(self.db.engine))()
-        self.session.execute("SET maintenance_work_mem TO 1000000;")
+        self.table_metadata()
 
-    def commit(self):
-        self.session.commit()
-        self.session.execute("SET maintenance_work_mem TO 1000000;")
+    def table_metadata(self):
+        self.table_obj = db.metadata.tables[self.sql_table]
+        self.primary_key = self.table_obj.primary_key
+        self.foreign_keys = self.table_obj.foreign_key_constraints
 
-    def rollback(self):
-        self.session.rollback()
-        self.session.execute("SET maintenance_work_mem TO 1000000;")
+    def set_session(self, session):
+        self.session = session
 
-    def close(self):
-        self.session.commit()
-        self.session.remove()
+    def delete_session(self):
         del self.session
 
     def drop_pk(self):
         logger.info(f"Dropping {self.sql_table} primary key")
-        self.session.execute(DropConstraint(self.primary_key))
+        try:
+            with self.session.begin_nested():
+                self.session.execute(DropConstraint(self.primary_key, cascade=True))
+        except SQLAlchemyError:
+            logger.info(f"{self.sql_table} primary key not found. Skipping")
 
     def create_pk(self):
         logger.info(f"Creating {self.sql_table} primary key")
         self.session.execute(AddConstraint(self.primary_key))
 
     def drop_fks(self):
-        self.commit()
         for fk in self.foreign_keys:
+            logger.info(f"Dropping foreign key {fk.name}")
             try:
-                logger.info(f"Dropping foreign key {fk.name}")
-                self.session.execute(DropConstraint(fk))
-                self.commit()
+                with self.session.begin_nested():
+                    self.session.execute(DropConstraint(fk))
             except SQLAlchemyError:
                 logger.warn(f"Foreign key {fk.name} not found")
-                self.rollback()
 
     def create_fks(self):
-        self.commit()
         for fk in self.foreign_keys:
             try:
                 logger.info(f"Creating foreign key {fk.name}")
                 self.session.execute(AddConstraint(fk))
-                self.commit()
             except SQLAlchemyError:
                 logger.warn(f"Error creating foreign key {fk.name}")
-                self.rollback()
 
     def truncate(self):
         logger.info(f"Truncating {self.sql_table}")
@@ -93,16 +84,16 @@ class PGTable(object):
     def copy_from_file(self, file_object):
         cur = self.session.connection().connection.cursor()
         cols = ", ".join([f"{col}" for col in self.columns])
-        sql = f"COPY {self.table} ({cols}) FROM STDIN WITH CSV HEADER FREEZE"
+        sql = f"COPY {self.sql_table} ({cols}) FROM STDIN WITH CSV HEADER FREEZE"
         cur.copy_expert(sql=sql, file=file_object)
 
     def copy_table(self):
-        # Assumes foreign keys already dropped for now
+        self.drop_fks()
         self.drop_pk()
         self.truncate()
         self.hdf_to_pg()
         self.create_pk()
-        self.create_fks()
+        # self.create_fks()
 
     def hdf_to_pg(self):
         if self.hdf_tables is None:
@@ -121,7 +112,7 @@ class PGTable(object):
             df = cast_pandas(df, self.table_obj)
             df = add_level_metadata(df, hdf_levels)
 
-            if not self.columns:
+            if self.columns is None:
                 self.columns = df.columns
 
             logger.info("Creating generator for chunking dataframe")
@@ -138,6 +129,9 @@ class PGTable(object):
 
 
 class PGClassificationTable(PGTable):
+    def __init__(self, sql_table, hdf_tables, hdf_meta, csv_chunksize=10 ** 6):
+        PGTable.__init__(self, sql_table, hdf_tables, hdf_meta, csv_chunksize)
+
     def hdf_to_pg(self):
         if self.hdf_tables is None:
             logger.warn("No HDF table found for SQL table {self.sql_table}")
@@ -153,7 +147,7 @@ class PGClassificationTable(PGTable):
             df = classification_to_pandas(df)
             df = cast_pandas(df, self.table_obj)
 
-            if not self.columns:
+            if self.columns is None:
                 self.columns = df.columns
 
             logger.info("Creating CSV in memory")
@@ -167,6 +161,9 @@ class PGClassificationTable(PGTable):
 
 
 class PGPartnerTable(PGTable):
+    def __init__(self, sql_table, hdf_tables, hdf_meta, csv_chunksize=10 ** 6):
+        PGTable.__init__(self, sql_table, hdf_tables, hdf_meta, csv_chunksize)
+
     def hdf_to_pg(self):
         if self.hdf_tables is None:
             logger.warn(f"No HDF table found for SQL table {self.sql_table}")
@@ -199,6 +196,9 @@ class PGPartnerTable(PGTable):
                 df = cast_pandas(df, self.table_obj)
                 df = add_level_metadata(df, hdf_levels)
 
+                if self.columns is None:
+                    self.columns = df.columns
+
                 logger.info("Creating generator for chunking dataframe")
                 for chunk in df_generator(df, self.csv_chunksize):
                     logger.info("Creating CSV in memory")
@@ -213,48 +213,64 @@ class PGPartnerTable(PGTable):
 
 class HDFMetadata(object):
 
-    self.sql_to_hdf = defaultdict(list)
-    self.levels = {}
+    sql_to_hdf = defaultdict(list)
+    levels = {}
 
     def __init__(self, file_name="./data.h5", keys=None, chunksize=10 ** 7):
         self.file_name = file_name
-        self.keys = keys or self.store.keys()
-        self.chunksize = chunksize
 
-        store = pd.HDFStore(self.file_name, mode="r")
-        for key in self.keys:
-            try:
-                metadata = store.get_storer(key).attrs.atlas_metadata
-                logger.info(f"Metadata: {metadata}")
-            except AttributeError:
-                logger.info(f"Attribute Error: Skipping {key}")
-                continue
+        with pd.HDFStore(self.file_name, mode="r") as store:
+            self.keys = keys or store.keys()
+            self.chunksize = chunksize
 
-            self.levels[key] = metadata['levels']
+            for key in self.keys:
+                try:
+                    metadata = store.get_storer(key).attrs.atlas_metadata
+                    logger.info(f"Metadata: {metadata}")
+                except AttributeError:
+                    logger.info(f"Attribute Error: Skipping {key}")
+                    continue
 
-            sql_table = metadata.get("sql_table_name")
-            if sql_table:
-                self.sql_to_hdf[sql_table].append(key)
-            else:
-                logger.warn(f"No SQL table name found for {key}")
-        store.close()
+                self.levels[key] = metadata["levels"]
+
+                sql_table = metadata.get("sql_table_name")
+                if sql_table:
+                    self.sql_to_hdf[sql_table].append(key)
+                else:
+                    logger.warn(f"No SQL table name found for {key}")
 
 
-def create_table_objects(hdf):
+def create_table_objects(hdf_meta, csv_chunksize=10 ** 6):
     classifications = []
     partners = []
     other = []
 
-    for sql_table, hdf_tables in hdf.sql_to_hdf.items():
+    for sql_table, hdf_tables in hdf_meta.sql_to_hdf.items():
         if any("classifications/" in table for table in hdf_tables):
-            classifications.append(PGClassificationTable(db, sql_table, hdf_tables, hdf, csv_chunksize))
+            classifications.append(
+                PGClassificationTable(sql_table, hdf_tables, hdf_meta, csv_chunksize)
+            )
         elif any("partner" in table for table in hdf_tables):
-            partners.append(PGPartnerTable(db, sql_table, hdf_tables, hdf, csv_chunksize))
+            partners.append(
+                PGPartnerTable(sql_table, hdf_tables, hdf_meta, csv_chunksize)
+            )
         else:
-            other.append(PGTable(db, sql_table, hdf_tables, hdf, csv_chunksize))
+            other.append(PGTable(sql_table, hdf_tables, hdf_meta, csv_chunksize))
 
     # Return the objects sorted classifications, then partner, then other
-    return classifications + partners + other
+    return classifications, partners + other
+
+
+def copy_worker(table_obj):
+    session = Session()
+
+    with session.begin():
+        session.execute("SET maintenance_work_mem TO 1000000;")
+        table_obj.set_session(session)
+        table_obj.copy_table()
+        table_obj.delete_session()
+
+    session.close()
 
 
 def hdf_to_postgres(
@@ -262,11 +278,16 @@ def hdf_to_postgres(
 ):
 
     hdf = HDFMetadata(file_name, keys, hdf_chunksize)
-    tables = create_table_objects(hdf, csv_chunksize)
+    classifications, tables = create_table_objects(hdf, csv_chunksize)
 
-    # Drop all FKs at beginning to not have conflicts
-    for table in tables:
-        table.drop_fks()
+    for ct in classifications:
+        copy_worker(ct)
 
-    for table in tables:
-        table.
+    try:
+        n_threads = 3
+        logger.info(f"Initiating pool with {n_threads} processes")
+        p = Pool(n_threads)
+        p.map(copy_worker, tables)
+    finally:
+        p.close()
+        p.join()
