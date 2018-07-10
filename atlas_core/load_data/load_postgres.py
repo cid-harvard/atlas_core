@@ -1,6 +1,12 @@
-from .utilities import (create_file_object, df_generator, logger, hdf_metadata,
-                        classification_to_pandas, cast_pandas,
-                        add_level_metadata)
+from .utilities import (
+    create_file_object,
+    df_generator,
+    logger,
+    hdf_metadata,
+    classification_to_pandas,
+    cast_pandas,
+    add_level_metadata,
+)
 from atlas_core import db
 
 import pandas as pd
@@ -31,7 +37,7 @@ def rollback(session):
 
 
 def copy_to_database(session, table, columns, file_object):
-    '''
+    """
     Copy data to Postgres table using COPY command
 
     Parameters
@@ -43,10 +49,10 @@ def copy_to_database(session, table, columns, file_object):
         list of columns in table corresponding to data in file
     file_object: StringIO
         in-memory csv file to use to copy from
-    '''
+    """
     cur = session.connection().connection.cursor()
-    columns = ', '.join([f'{col}' for col in columns])
-    sql = f'COPY {table} ({columns}) FROM STDIN WITH CSV HEADER FREEZE'
+    columns = ", ".join([f"{col}" for col in columns])
+    sql = f"COPY {table} ({columns}) FROM STDIN WITH CSV HEADER FREEZE"
     cur.copy_expert(sql=sql, file=file_object)
 
 
@@ -57,14 +63,15 @@ def update_level_fields(db, hdf_table, sql_table, levels):
 
     for level, value in levels.get(hdf_table).items():
         col_name = level + "_level"
-        update_obj = update_obj.values({col_name: value})\
-                               .where(table_obj.c[col_name].is_(None))
+        update_obj = update_obj.values({col_name: value}).where(
+            table_obj.c[col_name].is_(None)
+        )
 
     return update_obj
 
 
 def chunk_copy_df(session, df, sql_table, dest_chunksize):
-    '''
+    """
     Copy pandas dataframe to postgres table in iterative chunks
 
     Parameters
@@ -73,7 +80,7 @@ def chunk_copy_df(session, df, sql_table, dest_chunksize):
     df: pandas dataframe
     sql_table: str
     dest_chunksize: int
-    '''
+    """
     logger.info("Creating generator for chunking dataframe")
     for chunk in df_generator(df, dest_chunksize):
 
@@ -86,7 +93,7 @@ def chunk_copy_df(session, df, sql_table, dest_chunksize):
 
 
 def drop_foreign_keys(session):
-    '''
+    """
     Drop all foreign keys in a database.
 
     Parameters
@@ -98,7 +105,7 @@ def drop_foreign_keys(session):
     -------
     db_foreign_keys: dict
         dict of sql table keys with list of ForeignKeyConstraint values
-    '''
+    """
 
     insp = reflection.Inspector.from_engine(db.engine)
     db_foreign_keys = {}
@@ -119,7 +126,7 @@ def drop_foreign_keys(session):
 
 
 def sort_tables(sql_to_hdf):
-    '''
+    """
     Returns sorted list of tables with classification tables in first positions
     and large partner tables next to distribute across threads
 
@@ -132,7 +139,7 @@ def sort_tables(sql_to_hdf):
     -------
     sorted_tables: dict
         Dict of lists of classification, partner, and other tables
-    '''
+    """
 
     sorted_tables = defaultdict(list)
 
@@ -157,7 +164,7 @@ def prepare_table(session, sql_table):
 
     # Truncate SQL table
     logger.info("Truncating %s", sql_table)
-    session.execute('TRUNCATE TABLE {};'.format(sql_table))
+    session.execute("TRUNCATE TABLE {};".format(sql_table))
 
     return table_obj, pk
 
@@ -174,8 +181,15 @@ def recreate_table_keys(session, sql_table, pk, foreign_keys):
             session.execute(AddConstraint(fk))
 
 
-def copy_classifications(sql_table, sql_to_hdf, file_name, levels,
-                         source_chunksize, dest_chunksize, foreign_keys):
+def copy_classifications(
+    sql_table,
+    sql_to_hdf,
+    file_name,
+    levels,
+    source_chunksize,
+    dest_chunksize,
+    foreign_keys,
+):
     rows = 0
     session = make_session()
     table_obj, pk = prepare_table(session, sql_table)
@@ -217,8 +231,15 @@ def copy_classifications(sql_table, sql_to_hdf, file_name, levels,
     session.close()
 
 
-def copy_partner_table(sql_table, sql_to_hdf, file_name, levels,
-                        source_chunksize, dest_chunksize, foreign_keys):
+def copy_partner_table(
+    sql_table,
+    sql_to_hdf,
+    file_name,
+    levels,
+    source_chunksize,
+    dest_chunksize,
+    foreign_keys,
+):
 
     rows = 0
     session = make_session()
@@ -247,13 +268,11 @@ def copy_partner_table(sql_table, sql_to_hdf, file_name, levels,
         start = 0
 
         for i in range(n_chunks):
-            logger.info("*** HDF chunk %(i)s of %(n)s ***",
-                        {'i': i + 1, 'n': n_chunks})
+            logger.info("*** HDF chunk %(i)s of %(n)s ***", {"i": i + 1, "n": n_chunks})
 
             logger.info("Reading HDF table")
             stop = min(start + source_chunksize, nrows)
-            df = pd.read_hdf(file_name, key=hdf_table,
-                             start=start, stop=stop)
+            df = pd.read_hdf(file_name, key=hdf_table, start=start, stop=stop)
 
             start += source_chunksize
 
@@ -268,8 +287,15 @@ def copy_partner_table(sql_table, sql_to_hdf, file_name, levels,
     return rows
 
 
-def copy_table(sql_table, sql_to_hdf, file_name, levels,
-               source_chunksize, dest_chunksize, foreign_keys):
+def copy_table(
+    sql_table,
+    sql_to_hdf,
+    file_name,
+    levels,
+    source_chunksize,
+    dest_chunksize,
+    foreign_keys,
+):
 
     rows = 0
     session = make_session()
@@ -301,9 +327,10 @@ def copy_table(sql_table, sql_to_hdf, file_name, levels,
     return rows
 
 
-def hdf_to_postgres(file_name="./data.h5", keys=None, source_chunksize=10**7,
-                    dest_chunksize=10**6):
-    '''
+def hdf_to_postgres(
+    file_name="./data.h5", keys=None, source_chunksize=10 ** 7, dest_chunksize=10 ** 6
+):
+    """
     Copy a HDF file to a postgres database
 
     Parameters
@@ -316,7 +343,7 @@ def hdf_to_postgres(file_name="./data.h5", keys=None, source_chunksize=10**7,
         when reading HDF file in chunks, max row count
     dest_chunksize: int
         max number of rows to read/copy in any transaction
-    '''
+    """
 
     session = make_session()
     session.execute("SET maintenance_work_mem TO 1000000;")
@@ -334,16 +361,24 @@ def hdf_to_postgres(file_name="./data.h5", keys=None, source_chunksize=10**7,
     sql_tables = sort_tables(sql_to_hdf)
 
     def gen_args(sql_tables):
-        return [(sql_table, sql_to_hdf, file_name, levels, source_chunksize,
-                 dest_chunksize, db_foreign_keys.get(sql_table))
-                for sql_table
-                in sql_tables]
+        return [
+            (
+                sql_table,
+                sql_to_hdf,
+                file_name,
+                levels,
+                source_chunksize,
+                dest_chunksize,
+                db_foreign_keys.get(sql_table),
+            )
+            for sql_table in sql_tables
+        ]
 
     try:
         p = Pool(3)
-        p.starmap(copy_classifications, gen_args(sql_tables.get('classifications')))
-        p.starmap(copy_partner_table, gen_args(sql_tables.get('partner')))
-        p.starmap(copy_table, gen_args(sql_tables.get('other')))
+        p.starmap(copy_classifications, gen_args(sql_tables.get("classifications")))
+        p.starmap(copy_partner_table, gen_args(sql_tables.get("partner")))
+        p.starmap(copy_table, gen_args(sql_tables.get("other")))
     finally:
         p.close()
         p.join()
