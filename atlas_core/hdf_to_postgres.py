@@ -1,4 +1,5 @@
 from atlas_core import db
+from typing import List, Callable
 from pandas import DataFrame
 from multiprocessing import Pool
 from sqlalchemy.exc import SQLAlchemyError
@@ -30,7 +31,7 @@ def add_level_metadata(
     df: pandas DataFrame with level fields added
     """
 
-    hdf_levels = copy_obj.levels.get(hdf_table)
+    hdf_levels = copy_obj.hdf_metadata["levels"].get(hdf_table)
 
     if hdf_levels:
         logger.info("Adding level metadata values")
@@ -116,7 +117,9 @@ def create_table_objects(hdf_meta, csv_chunksize=10 ** 6):
 
 
 def copy_worker(
-    copy_obj, multiprocess=True, data_formatters=[cast_pandas, add_level_metadata]
+    copy_obj: HDFTableCopy,
+    multiprocess: bool = True,
+    data_formatters: List[Callable] = [cast_pandas, add_level_metadata],
 ):
     e.dispose()
     with e.connect() as conn:
@@ -131,9 +134,18 @@ def copy_worker(
 
 
 def hdf_to_postgres(
-    file_name="./data.h5", keys=None, hdf_chunksize=10 ** 7, csv_chunksize=10 ** 6
+    file_name: str = "./data.h5",
+    keys: List[str] = [],
+    hdf_chunksize: int = 10 ** 7,
+    csv_chunksize: int = 10 ** 6,
 ):
-    hdf = HDFMetadata(file_name, keys, hdf_chunksize)
+    hdf = HDFMetadata(
+        file_name,
+        keys,
+        hdf_chunksize,
+        metadata_attr="atlas_metadata",
+        metadata_keys=["levels"],
+    )
     classifications, tables = create_table_objects(hdf, csv_chunksize=csv_chunksize)
 
     with e.connect() as conn:
@@ -153,7 +165,6 @@ def hdf_to_postgres(
     try:
         p = Pool(4)
         p.imap_unordered(copy_worker, tables, chunksize=1)
-        # p.map(copy_worker, tables, chunksize=1)
     except Exception as ex:
         logger.exception(ex)
     finally:
