@@ -119,7 +119,7 @@ def create_table_objects(hdf_meta, csv_chunksize=10 ** 6):
 def copy_worker(
     copy_obj: HDFTableCopy,
     multiprocess: bool = True,
-    data_formatters: List[Callable] = [cast_pandas, add_level_metadata],
+    data_formatters: List[Callable] = [add_level_metadata, cast_pandas],
 ):
     e.dispose()
     with e.connect() as conn:
