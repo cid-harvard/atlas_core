@@ -4,7 +4,7 @@ from multiprocessing import Pool
 from sqlalchemy.exc import SQLAlchemyError
 from pandas_to_postgres import (
     HDFTableCopy,
-    ClassificationHDFTableCopy,
+    SmallHDFTableCopy,
     BigHDFTableCopy,
     HDFMetadata,
     logger,
@@ -82,7 +82,7 @@ def create_table_objects(hdf_meta, csv_chunksize=10 ** 6):
     for sql_table, hdf_tables in hdf_meta.sql_to_hdf.items():
         if any("classifications/" in table for table in hdf_tables):
             classifications.append(
-                ClassificationHDFTableCopy(
+                SmallHDFTableCopy(
                     hdf_tables,
                     hdf_meta,
                     defer_sql_objs=True,
