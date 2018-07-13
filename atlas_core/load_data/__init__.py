@@ -1,2 +1,1 @@
-from .utilities import *
-from .load_postgres import *
+from .copy_postgres import hdf_to_postgres
