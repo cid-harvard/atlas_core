@@ -165,16 +165,16 @@ def hdf_to_postgres(
         )
 
     # Use multiprocessing for the larger tables once classifications are complete
-    args = zip(
+    pool_args = zip(
         tables,
         [engine_args] * len(tables),
         [engine_kwargs] * len(tables),
         [maintenance_work_mem] * len(tables),
-        [add_level_metadata, cast_pandas] * len(tables),
+        [[add_level_metadata, cast_pandas]] * len(tables),
     )
     try:
         p = Pool(processes)
-        result = p.starmap_async(copy_worker, args, chunksize=1)
+        result = p.starmap_async(copy_worker, pool_args, chunksize=1)
     finally:
         del tables
         p.close()
