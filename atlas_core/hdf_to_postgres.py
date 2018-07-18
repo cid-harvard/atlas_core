@@ -170,6 +170,7 @@ def hdf_to_postgres(
         [engine_args] * len(tables),
         [engine_kwargs] * len(tables),
         [maintenance_work_mem] * len(tables),
+        [add_level_metadata, cast_pandas] * len(tables),
     )
     try:
         p = Pool(processes)
