@@ -1,4 +1,3 @@
-import logging
 from atlas_core import db
 from multiprocessing import Pool
 from sqlalchemy.exc import SQLAlchemyError
@@ -9,16 +8,10 @@ from pandas_to_postgres import (
     cast_pandas,
     hdf_metadata,
     copy_worker,
+    get_logger,
 )
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s.%(msecs)03d - %(name)s - %(levelname)s %(message)s",
-    datefmt="%Y-%m-%d,%H:%M:%S",
-)
-
-logger = logging.getLogger("hdf_to_postgres")
-
+logger = get_logger("hdf_to_postgres")
 
 e = db.engine
 
