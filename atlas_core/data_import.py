@@ -8,7 +8,9 @@ def classification_to_pandas(df, optional_fields=["name_es", "name_short_en",
                                                   "description_en",
                                                   "description_es",
                                                   "is_trusted",
-                                                  "in_rankings"
+                                                  "in_rankings",
+                                                  "reported_serv",
+                                                  "reported_serv_recent",
                                                   ]):
     """Convert a classification from the format it comes in the classification
     file (which is the format from the 'classifications' github repository)
