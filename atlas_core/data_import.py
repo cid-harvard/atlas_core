@@ -4,8 +4,13 @@ from sqlalchemy.exc import SQLAlchemyError
 from load_data import hdf_to_postgres, classification_to_pandas
 
 
-def import_data_sqlite(file_name="./data.h5", engine=None, keys=None,
-                       source_chunksize=10**6, dest_chunksize=10**6):
+def import_data_sqlite(
+    file_name="./data.h5",
+    engine=None,
+    keys=None,
+    source_chunksize=10 ** 6,
+    dest_chunksize=10 ** 6,
+):
     # Keeping this import inlined to avoid a dependency unless needed
     import pandas as pd
 
@@ -37,15 +42,20 @@ def import_data_sqlite(file_name="./data.h5", engine=None, keys=None,
             if key.startswith("/classifications/"):
                 df = pd.read_hdf(file_name, key=key)
                 df = classification_to_pandas(df)
-                df.to_sql(table_name, engine, index=False,
-                          chunksize=dest_chunksize, if_exists="append")
+                df.to_sql(
+                    table_name,
+                    engine,
+                    index=False,
+                    chunksize=dest_chunksize,
+                    if_exists="append",
+                )
 
             else:
                 # If it's a timeseries data table, load it in chunks to not
                 # exhaust memory all at once
-                iterator = pd.read_hdf(file_name, key=key,
-                                       chunksize=source_chunksize,
-                                       iterator=True)
+                iterator = pd.read_hdf(
+                    file_name, key=key, chunksize=source_chunksize, iterator=True
+                )
 
                 for i, df in enumerate(iterator):
                     print(i * source_chunksize)
@@ -53,10 +63,15 @@ def import_data_sqlite(file_name="./data.h5", engine=None, keys=None,
                     # Add in level fields
                     if "levels" in metadata:
                         for entity, level_value in metadata["levels"].items():
-                            df[entity+"_level"] = level_value
+                            df[entity + "_level"] = level_value
 
-                    df.to_sql(table_name, engine, index=False,
-                              chunksize=dest_chunksize, if_exists="append")
+                    df.to_sql(
+                        table_name,
+                        engine,
+                        index=False,
+                        chunksize=dest_chunksize,
+                        if_exists="append",
+                    )
 
                     # Hint that this object should be garbage collected
                     del df
@@ -65,8 +80,14 @@ def import_data_sqlite(file_name="./data.h5", engine=None, keys=None,
             print(exc)
 
 
-def import_data(file_name="./data.h5", engine=None, source_chunksize=10**6,
-                dest_chunksize=10**6, keys=None, database="postgres"):
+def import_data(
+    file_name="./data.h5",
+    engine=None,
+    source_chunksize=10 ** 6,
+    dest_chunksize=10 ** 6,
+    keys=None,
+    database="postgres",
+):
     """Import data from a data.h5 (i.e. HDF) file into the SQL DB. This
     needs to be run from within the flask app context in order to be able to
     access the db engine currently in use.
@@ -86,9 +107,9 @@ def import_data(file_name="./data.h5", engine=None, source_chunksize=10**6,
 
     if database == "postgres":
         # No engine defined as a kwarg for postgres
-        hdf_to_postgres(file_name, keys, source_chunksize, dest_chunksize,
-                        commit_every=True)
+        hdf_to_postgres(
+            file_name, keys, source_chunksize, dest_chunksize, commit_every=True
+        )
 
     elif database == "sqlite":
-        import_data_sqlite(file_name, engine, keys, source_chunksize,
-                           dest_chunksize)
+        import_data_sqlite(file_name, engine, keys, source_chunksize, dest_chunksize)

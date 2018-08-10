@@ -50,6 +50,8 @@ def classification_to_pandas(
         "description_es",
         "is_trusted",
         "in_rankings",
+        "reported_serv",
+        "reported_serv_recent",
     ],
     **kwargs,
 ):
