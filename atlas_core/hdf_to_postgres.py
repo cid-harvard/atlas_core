@@ -1,6 +1,8 @@
 from atlas_core import db
 from multiprocessing import Pool
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import create_engine
+from flask_sqlalchemy import SQLAlchemy
 from pandas_to_postgres import (
     HDFTableCopy,
     SmallHDFTableCopy,
@@ -180,12 +182,30 @@ def hdf_to_postgres(
         result.get()
 
 
-if __name__ == "__main__":
+def multiload(app):
+    LOAD_DB = app.config.get("RDS_LOAD_DB_NAME")
+    LOAD_DB_URI = app.config.get("SQLALCHEMY_LOAD_DATABASE_URI")
+
+    if LOAD_DB:
+        try:
+            conn = db.engine.connect()
+            conn.execute("commit")
+            conn.execute(f"CREATE DATABASE {LOAD_DB}")
+        except SQLAlchemyError:
+            logger.info(
+                f"Error creating database {LOAD_DB}. It probably already exists."
+            )
+        finally:
+            conn.close()
+
+    load_engine = create_engine(LOAD_DB_URI)
+    db.metadata.create_all(load_engine)
+
     hdf_to_postgres(
         file_name="./data.h5",
         keys=None,
         processes=4,
-        engine_args=[db.engine.url],
+        engine_args=[LOAD_DB_URI],
         maintenance_work_mem="1GB",
         hdf_chunksize=10 ** 7,
         csv_chunksize=10 ** 6,
