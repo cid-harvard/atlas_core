@@ -15,8 +15,6 @@ from pandas_to_postgres import (
 
 logger = get_logger("hdf_to_postgres")
 
-e = db.engine
-
 
 def add_level_metadata(df, copy_obj, hdf_table, **kwargs):
     """
@@ -131,7 +129,7 @@ def hdf_to_postgres(
     file_name="./data.h5",
     keys=[],
     processes=4,
-    engine_args=[db.engine.url],
+    engine_args=[],  # [db.engine.url]
     engine_kwargs={},
     maintenance_work_mem="1GB",
     hdf_chunksize: int = 10 ** 7,
@@ -191,9 +189,10 @@ def multiload(app):
             conn = db.engine.connect()
             conn.execute("commit")
             conn.execute(f"CREATE DATABASE {LOAD_DB}")
+            logger.info(f"Created database {LOAD_DB}")
         except SQLAlchemyError:
             logger.info(
-                f"Error creating database {LOAD_DB}. It probably already exists."
+                f"Error creating database {LOAD_DB}. It probably already exists"
             )
         finally:
             conn.close()
