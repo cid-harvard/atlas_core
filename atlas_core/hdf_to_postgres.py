@@ -2,7 +2,6 @@ from atlas_core import db
 from multiprocessing import Pool
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import create_engine
-from flask_sqlalchemy import SQLAlchemy
 from pandas_to_postgres import (
     HDFTableCopy,
     SmallHDFTableCopy,
