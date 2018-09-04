@@ -1,63 +1,17 @@
 """Import from an ingested .hdf file to an sql database."""
-
 from sqlalchemy.exc import SQLAlchemyError
+from .helpers.classifications import classification_to_pandas
 
 
-def classification_to_pandas(df, optional_fields=["name_es", "name_short_en",
-                                                  "name_short_es",
-                                                  "description_en",
-                                                  "description_es",
-                                                  "is_trusted",
-                                                  "in_rankings",
-                                                  "reported_serv",
-                                                  "reported_serv_recent",
-                                                  ]):
-    """Convert a classification from the format it comes in the classification
-    file (which is the format from the 'classifications' github repository)
-    into the format that the flask apps use. Mostly just a thing for dropping
-    unneeded columns and renaming existing ones.
-
-    The optional_fields allows you to specify which fields should be considered
-    optional, i.e. it'll still work if this field doesn't exist in the
-    classification, like the description fields for example.
-    """
-
-    # Sort fields and change names appropriately
-    new_df = df[["index", "code", "name", "level", "parent_id"]]
-    new_df = new_df.rename(columns={
-        "index": "id",
-        "name": "name_en"
-    })
-
-    for field in optional_fields:
-        if field in df:
-            new_df[field] = df[field]
-
-    return new_df
-
-
-def import_data(file_name="./data.h5", engine=None, source_chunksize=10**6,
-                dest_chunksize=10**6, keys=None):
-    """Import data from a data.h5 (i.e. HDF) file into the SQL DB. This
-    needs to be run from within the flask app context in order to be able to
-    access the db engine currently in use.
-
-    In the HDF store, we expect to find one table per SQL table, with specific
-    attributes:
-
-        - sql_table_name: tells us which table to write to. If it doesn't
-        exist, we skip reading this table.
-        - product_level: modifies the "level" column, for cases when multiple
-        levels of data (e.g. 2digit and 4digit) get loaded into a single table
-
-    In addition, anything under the /classifications/ path in the HDF store
-    gets treated specially as a classification, and gets run through the
-    classification_to_pandas() function.
-    """
-
+def import_data_sqlite(
+    file_name="./data.h5",
+    engine=None,
+    keys=None,
+    source_chunksize=10 ** 6,
+    dest_chunksize=10 ** 6,
+):
     # Keeping this import inlined to avoid a dependency unless needed
     import pandas as pd
-    import sqlalchemy as sa
 
     print("Reading from file:'{}'".format(file_name))
     store = pd.HDFStore(file_name, mode="r")
@@ -87,16 +41,20 @@ def import_data(file_name="./data.h5", engine=None, source_chunksize=10**6,
             if key.startswith("/classifications/"):
                 df = pd.read_hdf(file_name, key=key)
                 df = classification_to_pandas(df)
-                df.to_sql(table_name, engine, index=False,
-                          chunksize=dest_chunksize, if_exists="append")
+                df.to_sql(
+                    table_name,
+                    engine,
+                    index=False,
+                    chunksize=dest_chunksize,
+                    if_exists="append",
+                )
 
             else:
-
                 # If it's a timeseries data table, load it in chunks to not
                 # exhaust memory all at once
-                iterator = pd.read_hdf(file_name, key=key,
-                                       chunksize=source_chunksize,
-                                       iterator=True)
+                iterator = pd.read_hdf(
+                    file_name, key=key, chunksize=source_chunksize, iterator=True
+                )
 
                 for i, df in enumerate(iterator):
                     print(i * source_chunksize)
@@ -104,13 +62,80 @@ def import_data(file_name="./data.h5", engine=None, source_chunksize=10**6,
                     # Add in level fields
                     if "levels" in metadata:
                         for entity, level_value in metadata["levels"].items():
-                            df[entity+"_level"] = level_value
+                            df[entity + "_level"] = level_value
 
-                    df.to_sql(table_name, engine, index=False,
-                              chunksize=dest_chunksize, if_exists="append")
+                    df.to_sql(
+                        table_name,
+                        engine,
+                        index=False,
+                        chunksize=dest_chunksize,
+                        if_exists="append",
+                    )
 
                     # Hint that this object should be garbage collected
                     del df
 
         except SQLAlchemyError as exc:
             print(exc)
+
+
+def import_data(
+    app=None,
+    file_name="./data.h5",
+    engine=None,
+    source_chunksize=10 ** 7,
+    dest_chunksize=10 ** 6,
+    keys=None,
+    database="postgres",
+    processes=4,
+):
+    """Import data from a data.h5 (i.e. HDF) file into the SQL DB. This
+    needs to be run from within the flask app context in order to be able to
+    access the db engine currently in use.
+
+    In the HDF store, we expect to find one table per SQL table, with specific
+    attributes:
+
+        - sql_table_name: tells us which table to write to. If it doesn't
+        exist, we skip reading this table.
+        - product_level: modifies the "level" column, for cases when multiple
+        levels of data (e.g. 2digit and 4digit) get loaded into a single table
+
+    In addition, anything under the /classifications/ path in the HDF store
+    gets treated specially as a classification, and gets run through the
+    classification_to_pandas() function.
+
+    Postgres-specific:
+    ------------------
+    The Postgres implementation doesn't take an engine object, but rather
+    constructs its own in order to paralellize tasks in multiple threads. We expect
+    two variables defined in the Flask configuration:
+
+        - DB_LOAD_NAME: The name of the logical database to create as a part of the
+            loading process.
+        - SQLALCHEMY_LOAD_DATABASE_URI: The server & database connection string to
+            connect to and load data into from the HDF5 file.
+
+    It is worth noting that it does use the atlas_core.db object to connect to to
+    create the DB_LOAD_NAME database as well as use its metadata to create the
+    database structures in the destination db.
+    """
+
+    if database == "postgres":
+        from hdf_to_postgres import multiload
+
+        multiload(
+            app=app,
+            file_name=file_name,
+            maintenance_work_mem="1GB",
+            hdf_chunksize=source_chunksize,
+            csv_chunksize=dest_chunksize,
+            keys=keys,
+            processes=processes,
+        )
+    elif database == "sqlite":
+        import_data_sqlite(file_name, engine, keys, source_chunksize, dest_chunksize)
+    else:
+        raise ValueError(
+            f"Database must be one of 'postgres' or 'sqlite', you gave {database}"
+        )

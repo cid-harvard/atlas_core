@@ -1,6 +1,7 @@
 Flask==1.0.2
 SQLAlchemy==1.1.14
-git+https://github.com/cid-harvard/flask-sqlalchemy.git@cid#egg=flask-sqlalchemy
+git+https://github.com/cid-harvard/pandas-to-postgres.git@v0.0.2#egg=pandas-to-postgres
 toastedmarshmallow==0.2.6
 lima==0.5
 six
+flask-sqlalchemy
