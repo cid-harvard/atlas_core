@@ -10,4 +10,6 @@ db.metadata.naming_convention = {
     "ix": "%(table_name)s_%(column_0_name)s_idx",
     "fk": "%(table_name)s_%(column_0_name)s_fkey",
     "pk": "%(table_name)s_pkey",
+    "uq": "%(table_name)s_%(column_0_name)s_uq",
+    "ck": "%(table_name)s_%(constraint_name)s_ck",
 }
