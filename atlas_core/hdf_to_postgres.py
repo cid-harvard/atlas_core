@@ -145,7 +145,7 @@ def hdf_to_postgres(
 
 
 def multiload(app):
-    LOAD_DB = app.config.get("RDS_LOAD_DB_NAME")
+    LOAD_DB = app.config.get("DB_LOAD_NAME")
     LOAD_DB_URI = app.config.get("SQLALCHEMY_LOAD_DATABASE_URI")
 
     if LOAD_DB:

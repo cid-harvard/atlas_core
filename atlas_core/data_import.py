@@ -102,15 +102,32 @@ def import_data(
     In addition, anything under the /classifications/ path in the HDF store
     gets treated specially as a classification, and gets run through the
     classification_to_pandas() function.
+
+    Postgres-specific:
+    ------------------
+    The Postgres implementation doesn't take an engine object, but rather
+    constructs its own in order to paralellize tasks in multiple threads. We expect
+    two variables defined in the Flask configuration:
+
+        - DB_LOAD_NAME: The name of the logical database to create as a part of the
+            loading process.
+        - SQLALCHEMY_LOAD_DATABASE_URI: The server & database connection string to
+            connect to and load data into from the HDF5 file.
+
+    It is worth noting that it does use the atlas_core.db object to connect to to
+    create the DB_LOAD_NAME database as well as use its metadata to create the
+    database structures in the destination db.
     """
 
     if database == "postgres":
         from hdf_to_postgres import hdf_to_postgres
 
-        # No engine defined as a kwarg for postgres
         hdf_to_postgres(
             file_name, keys, source_chunksize, dest_chunksize, commit_every=True
         )
-
     elif database == "sqlite":
         import_data_sqlite(file_name, engine, keys, source_chunksize, dest_chunksize)
+    else:
+        raise ValueError(
+            f"Database must be one of 'postgres' or 'sqlite', you gave {database}"
+        )
