@@ -36,8 +36,11 @@ class LocationClassificationTest(object):
 
 
 class SQLAlchemyLookupStrategyTest(object):
-    def fetch(self, slice_def, query):
-        return jsonify(data=[{"a": 1}, {"b": 2}, {"c": 3}])
+    def fetch(self, slice_def, query, json=True):
+        if json:
+            return jsonify(data=[{"a": 1}, {"b": 2}, {"c": 3}])
+        else:
+            return [{"a": 1}, {"b": 2}, {"c": 3}]
 
 
 entities = {
@@ -134,7 +137,11 @@ query_simple = {
         "product": {
             "value": 23,  # Inferred from URL pattern
         },
-    }
+    },
+    'year_range': {
+        'start': None,
+        'end': None,
+    },
 }
 
 # Then using the endpoint and dataset configs, we can decode more
@@ -151,7 +158,11 @@ query_interpreted = {
             "type": "hs_product",  # Inferred from arguments and dataset definition.
             "value": 23,
         },
-    }
+    },
+    'year_range': {
+        'start': None,
+        'end': None,
+    },
 }
 
 # Consulting the classifications, we can decode the input levels
@@ -169,7 +180,11 @@ query_with_levels = {
             "level": "4digit",  # Inferred from product id.
             "value": 23,
         },
-    }
+    },
+    'year_range': {
+        'start': None,
+        'end': None,
+    },
 }
 
 # Finally, with all we have, we can now look up slices that match our query, by
@@ -191,7 +206,11 @@ query_full = {
             "level": "4digit",
             "value": 23,
         },
-    }
+    },
+    'year_range': {
+        'start': None,
+        'end': None,
+    },
 }
 
 
@@ -230,7 +249,8 @@ class QueryBuilderTest(BaseTestCase):
             expected = {
                 'endpoint': 'product',
                 'arguments': {},
-                'result': {'level': '4digit'}
+                'result': {'level': '4digit'},
+                'year_range': {'start': None, 'end': None}
             }
             assert expected == request_to_query(request)
 
@@ -334,14 +354,12 @@ class QueryBuilderTest(BaseTestCase):
             # have to pass it in
             api_response = flask_handle_query(entities, datasets, endpoints)
 
-            json_response = json.loads(api_response.get_data().decode("utf-8"))
-            assert json_response["data"] == [{"a":1}, {"b":2}, {"c":3}]
+            assert api_response == [{"a":1}, {"b":2}, {"c":3}]
 
         with self.app.test_request_context("/data/product/?level=4digit"):
             api_response = flask_handle_query(entities, datasets, endpoints)
 
-            json_response = json.loads(api_response.get_data().decode("utf-8"))
-            assert json_response["data"] == [{"a": 1}, {"b": 2}, {"c": 3}]
+            assert api_response == [{"a": 1}, {"b": 2}, {"c": 3}]
 
 
 class SQLAlchemySliceLookupTest(BaseTestCase):
@@ -427,45 +445,53 @@ class SQLAlchemySliceLookupTest(BaseTestCase):
                     "level": "section",
                     "value": 1,
                 },
-            }
+            },
+            'year_range': {
+                'start': None,
+                'end': None,
+            },
         }
-        lookup = SQLAlchemyLookup(self.model, self.schema, json=False)
+        lookup = SQLAlchemyLookup(self.model, self.schema)
 
-        result = lookup.fetch(self.slice_def, query)
+        result = lookup.fetch(self.slice_def, query, json=False)
         expected = [
             {'year': 2007, 'location_id': '1', 'product_id': 1, 'export_value': 1000},
             {'year': 2008, 'location_id': '1', 'product_id': 1, 'export_value': 1100},
             {'year': 2007, 'location_id': '2', 'product_id': 1, 'export_value': 2000},
             {'year': 2008, 'location_id': '2', 'product_id': 1, 'export_value': 2100},
         ]
-        assert result == expected
+        assert result.data == expected
 
         query["arguments"]["product"]["value"] = 2
-        result = lookup.fetch(self.slice_def, query)
+        result = lookup.fetch(self.slice_def, query, json=False)
         expected = [
             {'year': 2007, 'location_id': '1', 'product_id': 2, 'export_value': 100},
             {'year': 2008, 'location_id': '1', 'product_id': 2, 'export_value': 110},
             {'year': 2007, 'location_id': '2', 'product_id': 2, 'export_value': 200},
             {'year': 2008, 'location_id': '2', 'product_id': 2, 'export_value': 210},
         ]
-        assert result == expected
+        assert result.data == expected
 
 
         query["arguments"]["product"]["value"] = 9999
-        result = lookup.fetch(self.slice_def, query)
+        result = lookup.fetch(self.slice_def, query, json=False)
         expected = []
-        assert result == expected
+        assert result.data == expected
 
         query = {
             'endpoint': 'product',
             'slice': 'product_year',
             'arguments': {},
-            'result': {'level': '4digit', 'type': 'product', 'field_name': 'product_id'}
+            'result': {'level': '4digit', 'type': 'product', 'field_name': 'product_id'},
+            'year_range': {
+                'start': None,
+                'end': None,
+            },
         }
         lookup = SQLAlchemyLookup(self.model, self.schema)
         # Should return results only filtered by result_level which is 4digit
         result = lookup.fetch(self.slice_def, query, json=False)
-        assert len(result) == 16
+        assert len(result.data) == 16
 
 
 class RegisterAPIsTest(BaseTestCase):
