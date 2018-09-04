@@ -144,7 +144,15 @@ def hdf_to_postgres(
         result.get()
 
 
-def multiload(app):
+def multiload(
+    app,
+    file_name="./data.h5",
+    keys=None,
+    processes=4,
+    maintenance_work_mem="1GB",
+    hdf_chunksize=10 ** 7,
+    csv_chunksize=10 ** 6,
+):
     LOAD_DB = app.config.get("DB_LOAD_NAME")
     LOAD_DB_URI = app.config.get("SQLALCHEMY_LOAD_DATABASE_URI")
 
@@ -165,11 +173,11 @@ def multiload(app):
     db.metadata.create_all(load_engine)
 
     hdf_to_postgres(
-        file_name="./data.h5",
-        keys=None,
-        processes=4,
+        file_name=file_name,
+        keys=keys,
+        processes=processes,
         engine_args=[LOAD_DB_URI],
-        maintenance_work_mem="1GB",
-        hdf_chunksize=10 ** 7,
-        csv_chunksize=10 ** 6,
+        maintenance_work_mem=maintenance_work_mem,
+        hdf_chunksize=hdf_chunksize,
+        csv_chunksize=csv_chunksize,
     )

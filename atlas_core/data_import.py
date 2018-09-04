@@ -80,12 +80,14 @@ def import_data_sqlite(
 
 
 def import_data(
+    app=None,
     file_name="./data.h5",
     engine=None,
-    source_chunksize=10 ** 6,
+    source_chunksize=10 ** 7,
     dest_chunksize=10 ** 6,
     keys=None,
     database="postgres",
+    processes=4,
 ):
     """Import data from a data.h5 (i.e. HDF) file into the SQL DB. This
     needs to be run from within the flask app context in order to be able to
@@ -120,10 +122,16 @@ def import_data(
     """
 
     if database == "postgres":
-        from hdf_to_postgres import hdf_to_postgres
+        from hdf_to_postgres import multiload
 
-        hdf_to_postgres(
-            file_name, keys, source_chunksize, dest_chunksize, commit_every=True
+        multiload(
+            app=app,
+            file_name=file_name,
+            maintenance_work_mem="1GB",
+            hdf_chunksize=source_chunksize,
+            csv_chunksize=dest_chunksize,
+            keys=keys,
+            processes=processes,
         )
     elif database == "sqlite":
         import_data_sqlite(file_name, engine, keys, source_chunksize, dest_chunksize)
