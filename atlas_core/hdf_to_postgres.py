@@ -93,7 +93,7 @@ def hdf_to_postgres(
     file_name="./data.h5",
     keys=[],
     processes=4,
-    engine_args=[db.engine.url],
+    engine_args=[],
     engine_kwargs={},
     maintenance_work_mem="1GB",
     hdf_chunksize: int = 10 ** 7,
