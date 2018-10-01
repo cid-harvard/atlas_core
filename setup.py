@@ -9,9 +9,10 @@ def read(fname, lines=False):
     else:
         return f.read()
 
+
 setup(
     name="atlas_core",
-    version="v0.2.7",
+    version="v1.3",
     author="Mali Akmanalp <Harvard CID>",
     description=("Core building blocks for atlas projects at CID."),
     url="http://github.com/cid-harvard/atlas_core",

@@ -1,4 +1,5 @@
 from flask import Flask
+from flask import cli
 
 from werkzeug.contrib.profiler import ProfilerMiddleware
 
@@ -6,11 +7,11 @@ from .core import db
 from .helpers.flask import APIError, handle_api_error, ForgivingJSONEncoder
 
 
-def load_config(app, additional_config={}):
+def load_config(app, overrides={}):
     """Load configuration from environment variable plus from additional
-    dictionary for test cases."""
+    dictionary for test cases etc."""
     app.config.from_envvar("FLASK_CONFIG")
-    app.config.update(additional_config)
+    app.config.update(overrides)
     return app
 
 
@@ -31,12 +32,24 @@ def create_db(app, db):
         db.create_all()
 
 
-def create_app(additional_config={}, name="atlas_core", standalone=False, custom_json_encoder=True):
+def create_app(additional_config={}, name="atlas_core", standalone=False,
+               custom_json_encoder=True, load_dotenv=False):
     """App factory. Creates a Flask `app` object and imports extensions, sets
     config variables etc."""
 
     app = Flask(name)
-    app = load_config(app, additional_config)
+
+    # Load environment variables from .env and .flaskenv including FLASK_APP
+    # and FLASK_CONFIG etc etc. The flask 1.0+ CLI (`flask commandname`) does
+    # this automatically if you have python-dotenv installed, but if you call
+    # create_app() manually from your own code you need this. This needs to
+    # happen before pretty much anything, so that we can customize even the
+    # flask config location with this.
+    if load_dotenv:
+        cli.load_dotenv()
+
+    # Load config from FLASK_CONFIG env variable.
+    app = load_config(app, overrides=additional_config)
 
     # Load extensions
     db.init_app(app)
