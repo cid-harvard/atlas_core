@@ -80,7 +80,6 @@ def import_data_sqlite(
 
 
 def import_data(
-    app=None,
     file_name="./data.h5",
     engine=None,
     source_chunksize=10 ** 7,
@@ -88,6 +87,7 @@ def import_data(
     keys=None,
     database="postgres",
     processes=4,
+    new_db_name=None,
 ):
     """Import data from a data.h5 (i.e. HDF) file into the SQL DB. This
     needs to be run from within the flask app context in order to be able to
@@ -107,17 +107,16 @@ def import_data(
 
     Postgres-specific:
     ------------------
-    The Postgres implementation doesn't take an engine object, but rather
-    constructs its own in order to paralellize tasks in multiple threads. We expect
-    two variables defined in the Flask configuration:
+    The Postgres implementation needs an engine with a URL pointing to to an
+    already existing database. This is because you can't connect to a
+    non-existent db in postges, but we need to connect to the server to create
+    the new DB. The new database name is derived from the data version in the
+    data_info table of the HDF file, or can be overridden with `new_db_name`.
+    The URL from the given engine is then modified to point to the newly
+    created database name.
 
-        - DB_LOAD_NAME: The name of the logical database to create as a part of the
-            loading process.
-        - SQLALCHEMY_LOAD_DATABASE_URI: The server & database connection string to
-            connect to and load data into from the HDF5 file.
-
-    It is worth noting that it does use the atlas_core.db object to connect to to
-    create the DB_LOAD_NAME database as well as use its metadata to create the
+    It is worth noting that this does use the atlas_core.db object to connect
+    to to create the new database as well as use its metadata to create the
     database structures in the destination db.
     """
 
@@ -125,12 +124,13 @@ def import_data(
         from hdf_to_postgres import multiload
 
         multiload(
-            app=app,
             file_name=file_name,
-            maintenance_work_mem="1GB",
+            engine=engine,
+            new_db_name=new_db_name,
             hdf_chunksize=source_chunksize,
             csv_chunksize=dest_chunksize,
             keys=keys,
+            maintenance_work_mem="1GB",
             processes=processes,
         )
     elif database == "sqlite":

@@ -3,6 +3,8 @@ from .helpers.classifications import classification_to_pandas
 from multiprocessing import Pool
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import create_engine
+from sqlalchemy.engine.url import make_url
+import string
 from pandas_to_postgres import (
     HDFTableCopy,
     SmallHDFTableCopy,
@@ -144,39 +146,80 @@ def hdf_to_postgres(
         result.get()
 
 
+def coerce_data_version(version):
+    """try to coerce a data version string into a valid sql92 database name.
+    according to the standard, db identifiers can only have letters,
+    underscores and digits:
+        https://db.apache.org/derby/docs/10.9/ref/crefsqlj1003454.html"""
+
+    # for name/date-based versions, replace dashes with underscores
+    version_new = version.replace("-", "_")
+
+    # for v2.3.1 style version,s replace dots with underscores
+    version_new = version_new.replace(".", "_")
+
+    valid_chars = set(string.digits + string.ascii_letters + "_")
+    if not all(x in valid_chars for x in version_new):
+        raise ValueError("Database names can only contain ASCII letters and "
+                         "numbers, and the underscore. You provided {} which we "
+                         "coerced into {}.".format(version, version_new))
+
+    return version_new
+
+
 def multiload(
-    app,
+    engine,
     file_name="./data.h5",
+    new_db_name=None,
     keys=None,
     processes=4,
     maintenance_work_mem="1GB",
     hdf_chunksize=10 ** 7,
     csv_chunksize=10 ** 6,
+    data_info_key="data_info",
 ):
-    LOAD_DB = app.config.get("DB_LOAD_NAME")
-    LOAD_DB_URI = app.config.get("SQLALCHEMY_LOAD_DATABASE_URI")
 
-    if LOAD_DB:
-        try:
-            conn = db.engine.connect()
-            conn.execute("commit")
-            conn.execute(f"CREATE DATABASE {LOAD_DB}")
-            logger.info(f"Created database {LOAD_DB}")
-        except SQLAlchemyError:
-            logger.info(
-                f"Error creating database {LOAD_DB}. It probably already exists"
-            )
-        finally:
-            conn.close()
+    # Fetch database name from data version
+    if new_db_name is None:
+        import pandas as pd
 
-    load_engine = create_engine(LOAD_DB_URI)
+        # Get data version from data_info table
+        info_df = pd.read_hdf(file_name, key=data_info_key).set_index("key")
+        new_db_name = info_df.loc["output_data_version", "value"]
+
+    # Coerce into a valid SQL db name
+    new_db_name = coerce_data_version(new_db_name)
+
+    # Try to create pg database. Connect using the default URI because in
+    # postgres you can't connect to a DB that doesn't exist yet, so we have to
+    # start with one that already exists.
+    try:
+        conn = engine.connect()
+        conn.execute("commit")
+        conn.execute(f"CREATE DATABASE \"{new_db_name}\"")
+        logger.info(f"Created database {new_db_name}")
+    except SQLAlchemyError:
+        logger.info(
+            f"Error creating database {new_db_name}. It probably already exists"
+        )
+    finally:
+        conn.close()
+
+    # Make new engine URL with existing URL string, replacing database name
+    load_url = make_url(engine.url)
+    load_url.database = new_db_name
+    load_url = str(load_url)
+
+    # Create empty SQL schema according to sqlalchemy models
+    load_engine = create_engine(load_url)
     db.metadata.create_all(load_engine)
 
+    # Load data into schema
     hdf_to_postgres(
         file_name=file_name,
         keys=keys,
         processes=processes,
-        engine_args=[LOAD_DB_URI],
+        engine_args=[load_url],
         maintenance_work_mem=maintenance_work_mem,
         hdf_chunksize=hdf_chunksize,
         csv_chunksize=csv_chunksize,
