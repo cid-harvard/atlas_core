@@ -121,7 +121,7 @@ def import_data(
     """
 
     if database == "postgres":
-        from hdf_to_postgres import multiload
+        from .hdf_to_postgres import multiload
 
         multiload(
             file_name=file_name,
