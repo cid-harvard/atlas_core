@@ -4,6 +4,7 @@ from sqlalchemy.ext.hybrid import hybrid_method
 
 class IDMixin(object):
     """Adds in an autoincremented integer ID primary key."""
+
     id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
 
     def __repr__(self):
@@ -11,7 +12,6 @@ class IDMixin(object):
 
 
 class I18nMixinBase(object):
-
     @hybrid_method
     def get_localized(self, field, lang):
         """Look up the language localized version of a field by looking up
@@ -26,4 +26,3 @@ class I18nMixinBase(object):
                 field_name = name + "_" + language
                 localized_fields[field_name] = sa.Column(value)
         return type(class_name, (I18nMixinBase,), localized_fields)
-

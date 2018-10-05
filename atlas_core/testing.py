@@ -12,7 +12,7 @@ class BaseTestCase(TestCase):
     SQLALCHEMY_DATABASE_URI = "sqlite://"
     ADDITIONAL_CONFIG = {
         "SQLALCHEMY_DATABASE_URI": SQLALCHEMY_DATABASE_URI,
-        "TESTING": True
+        "TESTING": True,
     }
 
     def create_app(self):

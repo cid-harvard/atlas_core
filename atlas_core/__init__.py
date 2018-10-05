@@ -18,11 +18,12 @@ def load_config(app, overrides={}):
 def add_profiler(app):
     """Add a profiler that runs on every request when PROFILE set to True."""
     if app.config.get("PROFILE", False):
-        app.wsgi_app = ProfilerMiddleware(app.wsgi_app,
-                                          restrictions=[30],
-                                          sort_by=("time", "cumulative"),
-                                          profile_dir=app.config.get("PROFILE_DIR", None)
-                                          )
+        app.wsgi_app = ProfilerMiddleware(
+            app.wsgi_app,
+            restrictions=[30],
+            sort_by=("time", "cumulative"),
+            profile_dir=app.config.get("PROFILE_DIR", None),
+        )
     return app
 
 
@@ -32,8 +33,13 @@ def create_db(app, db):
         db.create_all()
 
 
-def create_app(additional_config={}, name="atlas_core", standalone=False,
-               custom_json_encoder=True, load_dotenv=False):
+def create_app(
+    additional_config={},
+    name="atlas_core",
+    standalone=False,
+    custom_json_encoder=True,
+    load_dotenv=False,
+):
     """App factory. Creates a Flask `app` object and imports extensions, sets
     config variables etc."""
 
