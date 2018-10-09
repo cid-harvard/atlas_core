@@ -15,7 +15,9 @@ class SQLAlchemyLookup(ILookupStrategy):
     def get_column_by_name(self, name):
         column = getattr(self.model, name, None)
         if column is None:
-            raise ValueError("Column {} doesn't exist on model {}".format(name, self.model))
+            raise ValueError(
+                "Column {} doesn't exist on model {}".format(name, self.model)
+            )
         return column
 
     def get_all_model_columns(self):
@@ -33,37 +35,44 @@ class SQLAlchemyLookup(ILookupStrategy):
             key_column = self.get_column_by_name(query_facet["field_name"])
 
             # Generate predicate e.g. model.location_id==5
-            predicate = (key_column == query_facet["value"])
+            predicate = key_column == query_facet["value"]
             filter_predicates.append(predicate)
 
             # Do the same for the "level"
             level_column_name = query_facet.get(
                 "level_field_name",
-                query_facet["field_name"][:-3] + "_level",  # TODO: blah_id to blah_level
+                query_facet["field_name"][:-3]
+                + "_level",  # TODO: blah_id to blah_level
             )
             level_column = self.get_column_by_name(level_column_name)
-            level_predicate = (level_column == query_facet["level"])
+            level_predicate = level_column == query_facet["level"]
             filter_predicates.append(level_predicate)
             # TODO: how do we specify levels that don't need to be filtered by,
             # if the data already is partitioned? (e.g. geolevels)
 
         # Filter by result level also
-        level_column = self.get_column_by_name(query["result"]["field_name"][:-3] + "_level")
-        level_predicate = (level_column == query["result"]["level"])
+        level_column = self.get_column_by_name(
+            query["result"]["field_name"][:-3] + "_level"
+        )
+        level_predicate = level_column == query["result"]["level"]
         filter_predicates.append(level_predicate)
 
         # Filter by year ranges
-        year_column = self.get_column_by_name('year')
+        year_column = self.get_column_by_name("year")
 
-        if query['year_range']['start']:
-            start_predicate = (year_column >= query['year_range']['start'])
+        if query["year_range"]["start"]:
+            start_predicate = year_column >= query["year_range"]["start"]
             filter_predicates.append(start_predicate)
 
-        if query['year_range']['end']:
-            end_predicate = (year_column <= query['year_range']['end'])
+        if query["year_range"]["end"]:
+            end_predicate = year_column <= query["year_range"]["end"]
             filter_predicates.append(end_predicate)
 
-        q = list(db.session.query(*self.get_all_model_columns()).filter(*filter_predicates).all())
+        q = list(
+            db.session.query(*self.get_all_model_columns())
+            .filter(*filter_predicates)
+            .all()
+        )
 
         return lima.marshal(self.schema, q, json=json)
 

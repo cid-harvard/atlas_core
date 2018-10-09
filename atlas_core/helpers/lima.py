@@ -10,7 +10,9 @@ def marshal(schema, data, json=True, many=None):
     try:
         serialization_result = schema.dump(data)
     except Exception as exc:
-        raise abort(400, "Failed to serialize data", payload={"orig_exception": str(exc)})
+        raise abort(
+            400, "Failed to serialize data", payload={"orig_exception": str(exc)}
+        )
 
     if json:
         return jsonify(data=serialization_result)

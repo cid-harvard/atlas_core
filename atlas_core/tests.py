@@ -13,9 +13,14 @@ from .sqlalchemy import BaseModel
 from .model_mixins import IDMixin
 from .testing import BaseTestCase
 
-from .query_processing import (request_to_query, infer_levels,
-                               interpret_query, match_query,
-                               flask_handle_query, register_endpoints)
+from .query_processing import (
+    request_to_query,
+    infer_levels,
+    interpret_query,
+    match_query,
+    flask_handle_query,
+    register_endpoints,
+)
 from .slice_lookup import SQLAlchemyLookup
 
 
@@ -44,12 +49,8 @@ class SQLAlchemyLookupStrategyTest(object):
 
 
 entities = {
-    "hs_product": {
-        "classification": ProductClassificationTest(),
-    },
-    "location": {
-        "classification": LocationClassificationTest(),
-    },
+    "hs_product": {"classification": ProductClassificationTest()},
+    "location": {"classification": LocationClassificationTest()},
 }
 
 endpoints = {
@@ -71,45 +72,25 @@ endpoints = {
 datasets = {
     "product_year": {
         "facets": {
-            "product": {
-                "type": "hs_product",
-                "field_name": "product_id"
-            },
-            "year": {
-                "type": "year",
-                "field_name": "year",
-            },
+            "product": {"type": "hs_product", "field_name": "product_id"},
+            "year": {"type": "year", "field_name": "year"},
         },
         "slices": {
             "product_year": {
-                "levels": {
-                    "product": ["section", "4digit"],
-                },
+                "levels": {"product": ["section", "4digit"]},
                 "lookup_strategy": SQLAlchemyLookupStrategyTest(),
-            },
-        }
+            }
+        },
     },
     "location_product_year": {
         "facets": {
-            "product": {
-                "type": "hs_product",
-                "field_name": "product_id"
-            },
-            "location": {
-                "type": "location",
-                "field_name": "location_id"
-            },
-            "year": {
-                "type": "year",
-                "field_name": "year",
-            },
+            "product": {"type": "hs_product", "field_name": "product_id"},
+            "location": {"type": "location", "field_name": "location_id"},
+            "year": {"type": "year", "field_name": "year"},
         },
         "slices": {
             "country_product_year": {
-                "levels": {
-                    "location": ["country"],
-                    "product": ["section", "4digit"],
-                },
+                "levels": {"location": ["country"], "product": ["section", "4digit"]},
                 "lookup_strategy": SQLAlchemyLookupStrategyTest(),
             },
             "department_product_year": {
@@ -118,8 +99,8 @@ datasets = {
                     "product": ["section", "4digit"],
                 },
                 "lookup_strategy": SQLAlchemyLookupStrategyTest(),
-            }
-        }
+            },
+        },
     },
 }
 
@@ -130,18 +111,9 @@ query_url = "/data/product/23/exporters/?level=department"
 # Just using the URL, we perform some inference on the query:
 query_simple = {
     "endpoint": "product_exporters",  # Inferred from URL pattern
-    "result": {
-        "level": "department",  # Inferred from query param
-    },
-    "arguments": {
-        "product": {
-            "value": 23,  # Inferred from URL pattern
-        },
-    },
-    'year_range': {
-        'start': None,
-        'end': None,
-    },
+    "result": {"level": "department"},  # Inferred from query param
+    "arguments": {"product": {"value": 23}},  # Inferred from URL pattern
+    "year_range": {"start": None, "end": None},
 }
 
 # Then using the endpoint and dataset configs, we can decode more
@@ -157,34 +129,24 @@ query_interpreted = {
         "product": {
             "type": "hs_product",  # Inferred from arguments and dataset definition.
             "value": 23,
-        },
+        }
     },
-    'year_range': {
-        'start': None,
-        'end': None,
-    },
+    "year_range": {"start": None, "end": None},
 }
 
 # Consulting the classifications, we can decode the input levels
 query_with_levels = {
     "endpoint": "product_exporters",
     "dataset": "location_product_year",
-    "result": {
-        "name": "location",
-        "type": "location",
-        "level": "department",
-    },
+    "result": {"name": "location", "type": "location", "level": "department"},
     "arguments": {
         "product": {
             "type": "hs_product",
             "level": "4digit",  # Inferred from product id.
             "value": 23,
-        },
+        }
     },
-    'year_range': {
-        'start': None,
-        'end': None,
-    },
+    "year_range": {"start": None, "end": None},
 }
 
 # Finally, with all we have, we can now look up slices that match our query, by
@@ -205,22 +167,20 @@ query_full = {
             "type": "hs_product",
             "level": "4digit",
             "value": 23,
-        },
+        }
     },
-    'year_range': {
-        'start': None,
-        'end': None,
-    },
+    "year_range": {"start": None, "end": None},
 }
 
 
 class QueryBuilderTest(BaseTestCase):
-
     def setUp(self):
-        self.app = create_app({
-            # "SQLALCHEMY_DATABASE_URI": "sqlite://",
-            "TESTING": True
-        })
+        self.app = create_app(
+            {
+                # "SQLALCHEMY_DATABASE_URI": "sqlite://",
+                "TESTING": True
+            }
+        )
         self.test_client = self.app.test_client()
 
         @self.app.route("/data/product/")
@@ -236,7 +196,9 @@ class QueryBuilderTest(BaseTestCase):
         assert response.status_code == 200
         assert response.data == b"hello"
 
-        with self.app.test_request_context("/data/product/23/exporters/?level=department"):
+        with self.app.test_request_context(
+            "/data/product/23/exporters/?level=department"
+        ):
             assert request.path == "/data/product/23/exporters/"
             assert request.args["level"] == "department"
 
@@ -247,18 +209,22 @@ class QueryBuilderTest(BaseTestCase):
             assert request.args["level"] == "4digit"
 
             expected = {
-                'endpoint': 'product',
-                'arguments': {},
-                'result': {'level': '4digit'},
-                'year_range': {'start': None, 'end': None}
+                "endpoint": "product",
+                "arguments": {},
+                "result": {"level": "4digit"},
+                "year_range": {"start": None, "end": None},
             }
             assert expected == request_to_query(request)
 
     def test_002_interpret_query(self):
-        with self.app.test_request_context("/data/product/23/exporters/?level=department"):
+        with self.app.test_request_context(
+            "/data/product/23/exporters/?level=department"
+        ):
 
             # Test the happy path
-            assert query_interpreted == interpret_query(query_simple, entities, datasets, endpoints)
+            assert query_interpreted == interpret_query(
+                query_simple, entities, datasets, endpoints
+            )
 
             # Change endpoint to something we know doesn't exist
             query_bad_endpoint = copy.deepcopy(query_simple)
@@ -273,7 +239,9 @@ class QueryBuilderTest(BaseTestCase):
             # Check nonexistent facet names
 
     def test_003_infer_levels(self):
-        with self.app.test_request_context("/data/product/23/exporters/?level=department"):
+        with self.app.test_request_context(
+            "/data/product/23/exporters/?level=department"
+        ):
 
             # Test the happy path
             assert query_with_levels == infer_levels(query_interpreted, entities)
@@ -296,7 +264,9 @@ class QueryBuilderTest(BaseTestCase):
             # TODO: Check against bogus result level
 
     def test_004_match_query(self):
-        with self.app.test_request_context("/data/product/23/exporters/?level=department"):
+        with self.app.test_request_context(
+            "/data/product/23/exporters/?level=department"
+        ):
             assert query_full == match_query(query_with_levels, datasets, endpoints)
 
             # Change level to something else to make it not match
@@ -322,31 +292,38 @@ class QueryBuilderTest(BaseTestCase):
 
             # Too many matching slices
             datasets_modified = copy.deepcopy(datasets)
-            datasets_modified["location_product_year"]["slices"]["country_product_year"]["levels"]["location"] = ["country", "department"]
+            datasets_modified["location_product_year"]["slices"][
+                "country_product_year"
+            ]["levels"]["location"] = ["country", "department"]
             with pytest.raises(APIError) as exc:
                 match_query(query_with_levels, datasets_modified, endpoints)
             assert "too many matching slices" in str(exc.value)
 
         with self.app.test_request_context("/data/product/?level=4digit"):
             query = {
-                'endpoint': 'product',
-                'dataset': 'product_year',
-                'arguments': {
-                },
-                'result': {'name': 'product', 'type': 'hs_product', 'level': '4digit'}
+                "endpoint": "product",
+                "dataset": "product_year",
+                "arguments": {},
+                "result": {"name": "product", "type": "hs_product", "level": "4digit"},
             }
             expected = {
-                'endpoint': 'product',
-                'dataset': 'product_year',
-                'slice': 'product_year',
-                'arguments': {
+                "endpoint": "product",
+                "dataset": "product_year",
+                "slice": "product_year",
+                "arguments": {},
+                "result": {
+                    "name": "product",
+                    "type": "hs_product",
+                    "level": "4digit",
+                    "field_name": "product_id",
                 },
-                'result': {'name': 'product', 'type': 'hs_product', 'level': '4digit', 'field_name': 'product_id'}
             }
             assert expected == match_query(query, datasets, endpoints)
 
     def test_005_query_result(self):
-        with self.app.test_request_context("/data/product/23/exporters/?level=department"):
+        with self.app.test_request_context(
+            "/data/product/23/exporters/?level=department"
+        ):
             assert request.path == "/data/product/23/exporters/"
             assert request.args["level"] == "department"
 
@@ -354,7 +331,7 @@ class QueryBuilderTest(BaseTestCase):
             # have to pass it in
             api_response = flask_handle_query(entities, datasets, endpoints)
 
-            assert api_response == [{"a":1}, {"b":2}, {"c":3}]
+            assert api_response == [{"a": 1}, {"b": 2}, {"c": 3}]
 
         with self.app.test_request_context("/data/product/?level=4digit"):
             api_response = flask_handle_query(entities, datasets, endpoints)
@@ -363,7 +340,6 @@ class QueryBuilderTest(BaseTestCase):
 
 
 class SQLAlchemySliceLookupTest(BaseTestCase):
-
     def setUp(self):
         super().__init__()
 
@@ -406,13 +382,21 @@ class SQLAlchemySliceLookupTest(BaseTestCase):
             [3, "4digit", 3, "city", 2008, 2100],
             [4, "4digit", 4, "city", 2008, 210],
         ]
-        keys = ["product_id", "product_level", "location_id", "location_level", "year", "export_value"]
+        keys = [
+            "product_id",
+            "product_level",
+            "location_id",
+            "location_level",
+            "year",
+            "export_value",
+        ]
         data = [dict(zip(keys, i)) for i in data]
         db.engine.execute(self.model.__table__.insert(), data)
 
         class TestSchema(ma.Schema):
             class Meta:
                 fields = ("export_value", "product_id", "location_id", "year")
+
         self.schema = TestSchema(many=True)
 
         # self.app = register_endpoints(self.app, entities, data_slices, endpoints)
@@ -423,8 +407,8 @@ class SQLAlchemySliceLookupTest(BaseTestCase):
                 "product": {
                     "type": "product",
                     "levels_available": ["section", "4digit"],
-                },
-            },
+                }
+            }
         }
 
     def test_lookup(self):
@@ -444,34 +428,30 @@ class SQLAlchemySliceLookupTest(BaseTestCase):
                     "type": "hs_product",
                     "level": "section",
                     "value": 1,
-                },
+                }
             },
-            'year_range': {
-                'start': None,
-                'end': None,
-            },
+            "year_range": {"start": None, "end": None},
         }
         lookup = SQLAlchemyLookup(self.model, self.schema)
 
         result = lookup.fetch(self.slice_def, query, json=False)
         expected = [
-            {'year': 2007, 'location_id': '1', 'product_id': 1, 'export_value': 1000},
-            {'year': 2008, 'location_id': '1', 'product_id': 1, 'export_value': 1100},
-            {'year': 2007, 'location_id': '2', 'product_id': 1, 'export_value': 2000},
-            {'year': 2008, 'location_id': '2', 'product_id': 1, 'export_value': 2100},
+            {"year": 2007, "location_id": "1", "product_id": 1, "export_value": 1000},
+            {"year": 2008, "location_id": "1", "product_id": 1, "export_value": 1100},
+            {"year": 2007, "location_id": "2", "product_id": 1, "export_value": 2000},
+            {"year": 2008, "location_id": "2", "product_id": 1, "export_value": 2100},
         ]
         assert result.data == expected
 
         query["arguments"]["product"]["value"] = 2
         result = lookup.fetch(self.slice_def, query, json=False)
         expected = [
-            {'year': 2007, 'location_id': '1', 'product_id': 2, 'export_value': 100},
-            {'year': 2008, 'location_id': '1', 'product_id': 2, 'export_value': 110},
-            {'year': 2007, 'location_id': '2', 'product_id': 2, 'export_value': 200},
-            {'year': 2008, 'location_id': '2', 'product_id': 2, 'export_value': 210},
+            {"year": 2007, "location_id": "1", "product_id": 2, "export_value": 100},
+            {"year": 2008, "location_id": "1", "product_id": 2, "export_value": 110},
+            {"year": 2007, "location_id": "2", "product_id": 2, "export_value": 200},
+            {"year": 2008, "location_id": "2", "product_id": 2, "export_value": 210},
         ]
         assert result.data == expected
-
 
         query["arguments"]["product"]["value"] = 9999
         result = lookup.fetch(self.slice_def, query, json=False)
@@ -479,14 +459,15 @@ class SQLAlchemySliceLookupTest(BaseTestCase):
         assert result.data == expected
 
         query = {
-            'endpoint': 'product',
-            'slice': 'product_year',
-            'arguments': {},
-            'result': {'level': '4digit', 'type': 'product', 'field_name': 'product_id'},
-            'year_range': {
-                'start': None,
-                'end': None,
+            "endpoint": "product",
+            "slice": "product_year",
+            "arguments": {},
+            "result": {
+                "level": "4digit",
+                "type": "product",
+                "field_name": "product_id",
             },
+            "year_range": {"start": None, "end": None},
         }
         lookup = SQLAlchemyLookup(self.model, self.schema)
         # Should return results only filtered by result_level which is 4digit
@@ -495,12 +476,13 @@ class SQLAlchemySliceLookupTest(BaseTestCase):
 
 
 class RegisterAPIsTest(BaseTestCase):
-
     def setUp(self):
-        self.app = create_app({
-            # "SQLALCHEMY_DATABASE_URI": "sqlite://",
-            "TESTING": True
-        })
+        self.app = create_app(
+            {
+                # "SQLALCHEMY_DATABASE_URI": "sqlite://",
+                "TESTING": True
+            }
+        )
         self.app = register_endpoints(self.app, entities, datasets, endpoints)
         self.test_client = self.app.test_client()
 
@@ -511,12 +493,8 @@ class RegisterAPIsTest(BaseTestCase):
 
 
 class SQLAlchemyClassificationTest(BaseTestCase):
-
     def setUp(self):
-        self.app = create_app({
-            "SQLALCHEMY_DATABASE_URI": "sqlite://",
-            "TESTING": True
-        })
+        self.app = create_app({"SQLALCHEMY_DATABASE_URI": "sqlite://", "TESTING": True})
 
         class TestClassification(BaseModel):
             __tablename__ = "test_classification"
@@ -528,7 +506,9 @@ class SQLAlchemyClassificationTest(BaseTestCase):
             parent_id = db.Column(db.Integer)
 
         self.model = TestClassification
-        self.classification = SQLAlchemyClassification(self.model, ["top", "mid", "low", "bottom"])
+        self.classification = SQLAlchemyClassification(
+            self.model, ["top", "mid", "low", "bottom"]
+        )
         self.model.__table__.create(bind=db.engine)
 
         data = [
@@ -552,7 +532,7 @@ class SQLAlchemyClassificationTest(BaseTestCase):
             "code": "A202",
             "level": "bottom",
             "name": "Dump Trucks",
-            "parent_id": 6
+            "parent_id": 6,
         }
 
         assert self.classification.get_level_by_id(2) == "low"
@@ -564,14 +544,36 @@ class SQLAlchemyClassificationTest(BaseTestCase):
 
         assert self.classification.get_all() == self.data
 
-        assert self.classification.get_all(level="bottom") == [x for x in self.data if x["level"] == "bottom"]
+        assert self.classification.get_all(level="bottom") == [
+            x for x in self.data if x["level"] == "bottom"
+        ]
 
-        assert self.classification.aggregation_mapping("bottom", "top") == {4: 0, 7: 0, 8: 0}
-        assert self.classification.aggregation_mapping("bottom", "mid") == {4: 1, 7: 5, 8: 5}
-        assert self.classification.aggregation_mapping("bottom", "low") == {4: 3, 7: 6, 8: 6}
+        assert self.classification.aggregation_mapping("bottom", "top") == {
+            4: 0,
+            7: 0,
+            8: 0,
+        }
+        assert self.classification.aggregation_mapping("bottom", "mid") == {
+            4: 1,
+            7: 5,
+            8: 5,
+        }
+        assert self.classification.aggregation_mapping("bottom", "low") == {
+            4: 3,
+            7: 6,
+            8: 6,
+        }
 
-        assert self.classification.aggregation_mapping("low", "top") == {2: 0, 3: 0, 6: 0}
-        assert self.classification.aggregation_mapping("low", "mid") == {2: 1, 3: 1, 6: 5}
+        assert self.classification.aggregation_mapping("low", "top") == {
+            2: 0,
+            3: 0,
+            6: 0,
+        }
+        assert self.classification.aggregation_mapping("low", "mid") == {
+            2: 1,
+            3: 1,
+            6: 5,
+        }
 
         assert self.classification.aggregation_mapping("mid", "top") == {1: 0, 5: 0}
 

@@ -5,10 +5,7 @@ from sqlalchemy import inspect
 
 
 def object_as_dict(o):
-    return {
-        col.key: getattr(o, col.key)
-        for col in inspect(o).mapper.column_attrs
-    }
+    return {col.key: getattr(o, col.key) for col in inspect(o).mapper.column_attrs}
 
 
 class BaseQuery(db.Query):
@@ -41,8 +38,7 @@ class BaseQuery(db.Query):
             possible_values = enum.property.columns[0].type.enums
 
         if value not in possible_values:
-            msg = "Expected one of: {0}, got {1}"\
-                .format(possible_values, value)
+            msg = "Expected one of: {0}, got {1}".format(possible_values, value)
             abort(http_code, message=msg)
 
         return self.filter(enum == value)
@@ -51,9 +47,7 @@ class BaseQuery(db.Query):
 class BaseModel(db.Model):
     """Base Model object that sets sane defaults like InnoDB and utf8 for
     mysql, etc."""
+
     __abstract__ = True
-    __table_args__ = {
-        'mysql_engine': 'InnoDB',
-        'mysql_charset': 'utf8'
-    }
+    __table_args__ = {"mysql_engine": "InnoDB", "mysql_charset": "utf8"}
     query_class = BaseQuery

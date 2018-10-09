@@ -8,7 +8,6 @@ from functools import lru_cache
 
 
 class SQLAlchemyClassification(IClassification):
-
     def __init__(self, model, levels):
         self.model = model
         self.levels = levels
@@ -50,8 +49,12 @@ class SQLAlchemyClassification(IClassification):
         to_index = self.levels.index(to_level)
 
         if not (from_index > to_index):
-            raise ValueError("""{} is higher level than {}. Did you specify them
-                             backwards?""".format(from_level, to_level))
+            raise ValueError(
+                """{} is higher level than {}. Did you specify them
+                             backwards?""".format(
+                    from_level, to_level
+                )
+            )
 
         # Since we're going to have to create a series of self-joins to
         # traverse up the tree, generate as many aliases of the table as we
@@ -63,16 +66,12 @@ class SQLAlchemyClassification(IClassification):
 
         # We're looking for a mapping from the ids of `from_level` to the ids
         # of `to_level`
-        q = db.session.query(variables[0].id, variables[-1].id)\
-
+        q = db.session.query(variables[0].id, variables[-1].id)
         # Any row that isn't in from_level can be dropped
         q = q.filter(variables[0].level == from_level)
 
         # Join our parent_id to the id of the next level of the classification
         for i in range(from_index - to_index):
-            q = q.join(
-                variables[i + 1],
-                variables[i + 1].id == variables[i].parent_id
-            )
+            q = q.join(variables[i + 1], variables[i + 1].id == variables[i].parent_id)
 
         return dict(q.all())

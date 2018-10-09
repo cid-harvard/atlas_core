@@ -20,7 +20,7 @@ def assert_is_zeropadded_string(series):
     assert series.dtype in [np.object, np.str]
 
     # All entries in this column must be same length
-    assert (series.str.len().nunique() == 1)
+    assert series.str.len().nunique() == 1
 
 
 def matching_stats(series, classification_level):
@@ -33,17 +33,24 @@ def matching_stats(series, classification_level):
     classification_unique = classification_level.code
 
     rows_not_in_classification = ~series.isin(classification_unique)
-    percent_rows_not_in_classification = 100.0 * (rows_not_in_classification.sum() / num_rows)
+    percent_rows_not_in_classification = 100.0 * (
+        rows_not_in_classification.sum() / num_rows
+    )
 
     unique_not_in_classification = ~unique.isin(classification_unique)
-    percent_unique_not_in_classification = 100.0 * (unique_not_in_classification.sum() / num_unique)
+    percent_unique_not_in_classification = 100.0 * (
+        unique_not_in_classification.sum() / num_unique
+    )
 
     codes_missing = unique[unique_not_in_classification]
     codes_unused = classification_unique[~classification_unique.isin(series)]
 
-    return (percent_rows_not_in_classification,
-            percent_unique_not_in_classification,
-            codes_missing, codes_unused)
+    return (
+        percent_rows_not_in_classification,
+        percent_unique_not_in_classification,
+        codes_missing,
+        codes_unused,
+    )
 
 
 def assert_matches_classification_level(series, classification_level):
@@ -54,8 +61,7 @@ def fillin(df, entities):
     """STATA style "fillin", make sure all permutations of entities in the
     index are in the dataset."""
     df = df.set_index(entities)
-    return df.reindex(
-        pd.MultiIndex.from_product(df.index.levels, names=df.index.names))
+    return df.reindex(pd.MultiIndex.from_product(df.index.levels, names=df.index.names))
 
 
 def assert_rectangularized(df, entities):

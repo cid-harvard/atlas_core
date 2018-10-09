@@ -41,16 +41,22 @@ def make_metadata_api(classification, metadata_schema, api_metadata={}):
         try:
             mapping = classification.aggregation_mapping(from_level, to_level)
         except (AssertionError, ValueError):
-            abort(400, """Levels you gave me seem invalid. Are you sure
+            abort(
+                400,
+                """Levels you gave me seem invalid. Are you sure
                   from_level is lower than to_level and either are valid
-                  levels?""", payload=dict(levels=classification.levels))
+                  levels?""",
+                payload=dict(levels=classification.levels),
+            )
 
         return jsonify(data=mapping)
 
     return metadata_api, hierarchy_api
 
 
-def register_metadata_apis(app, entities, metadata_schema, url_prefix="metadata", api_metadata=[]):
+def register_metadata_apis(
+    app, entities, metadata_schema, url_prefix="metadata", api_metadata=[]
+):
     """Given an entity class, generate an API handler and register URL routes
     with flask. """
 
@@ -61,26 +67,34 @@ def register_metadata_apis(app, entities, metadata_schema, url_prefix="metadata"
         # Generate handler function for entity
         # Get custom schema if available
         our_metadata_schema = settings.get("schema", metadata_schema)
-        metadata_api_func, hierarchy_api_func = make_metadata_api(settings["classification"], our_metadata_schema, api_metadata)
+        metadata_api_func, hierarchy_api_func = make_metadata_api(
+            settings["classification"], our_metadata_schema, api_metadata
+        )
 
         # Singular endpoint e.g. /entity/7
         app.add_url_rule(
-            "/{url_prefix}/{entity_name}/<int:entity_id>".format(entity_name=entity_name, url_prefix=url_prefix),
+            "/{url_prefix}/{entity_name}/<int:entity_id>".format(
+                entity_name=entity_name, url_prefix=url_prefix
+            ),
             endpoint=entity_name + "_singular",
-            view_func=metadata_api_func
+            view_func=metadata_api_func,
         )
 
         # List endpoint e.g. /entity/
         app.add_url_rule(
-            "/{url_prefix}/{entity_name}/".format(entity_name=entity_name, url_prefix=url_prefix),
+            "/{url_prefix}/{entity_name}/".format(
+                entity_name=entity_name, url_prefix=url_prefix
+            ),
             endpoint=entity_name + "_all",
             view_func=metadata_api_func,
-            defaults={"entity_id": None}
+            defaults={"entity_id": None},
         )
 
         # Hierarchy endpoint e.g. /entity/hierarchy?from_level=blah&to_level=blah2
         app.add_url_rule(
-            "/{url_prefix}/{entity_name}/hierarchy".format(entity_name=entity_name, url_prefix=url_prefix),
+            "/{url_prefix}/{entity_name}/hierarchy".format(
+                entity_name=entity_name, url_prefix=url_prefix
+            ),
             endpoint=entity_name + "_hierarchy",
             view_func=hierarchy_api_func,
         )

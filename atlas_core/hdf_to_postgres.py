@@ -160,9 +160,11 @@ def coerce_data_version(version):
 
     valid_chars = set(string.digits + string.ascii_letters + "_")
     if not all(x in valid_chars for x in version_new):
-        raise ValueError("Database names can only contain ASCII letters and "
-                         "numbers, and the underscore. You provided {} which we "
-                         "coerced into {}.".format(version, version_new))
+        raise ValueError(
+            "Database names can only contain ASCII letters and "
+            "numbers, and the underscore. You provided {} which we "
+            "coerced into {}.".format(version, version_new)
+        )
 
     return version_new
 
@@ -196,7 +198,7 @@ def multiload(
     try:
         conn = engine.connect()
         conn.execute("commit")
-        conn.execute(f"CREATE DATABASE \"{new_db_name}\"")
+        conn.execute(f'CREATE DATABASE "{new_db_name}"')
         logger.info(f"Created database {new_db_name}")
     except SQLAlchemyError:
         logger.info(

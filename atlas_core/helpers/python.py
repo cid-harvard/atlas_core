@@ -19,7 +19,7 @@ def find_dict_in_list(l, exact_match=True, **kwargs):
     filtered_list = []
 
     for d in l:
-        for k,v in kwargs.items():
+        for k, v in kwargs.items():
             if d[k] != v:
                 break
         else:
@@ -33,5 +33,6 @@ def find_dict_in_list(l, exact_match=True, **kwargs):
     elif len(filtered_list) == 0:
         return None
     else:
-        raise ValueError("Too many matches!", dict(matches=filtered_list, predicates=kwargs))
-
+        raise ValueError(
+            "Too many matches!", dict(matches=filtered_list, predicates=kwargs)
+        )

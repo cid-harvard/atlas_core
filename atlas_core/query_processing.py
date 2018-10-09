@@ -9,9 +9,7 @@ def request_to_query(request):
 
     query = {
         "endpoint": request.url_rule.endpoint,
-        "result": {
-            "level": request.args.get("level", None),
-        }
+        "result": {"level": request.args.get("level", None)},
     }
 
     arguments = {}
@@ -20,12 +18,10 @@ def request_to_query(request):
         if k.endswith("_id"):
             k = k[:-3]
 
-        arguments[k] = {
-            "value": v,
-        }
+        arguments[k] = {"value": v}
 
     query["arguments"] = arguments
-    query['year_range'] = handle_year_range(request)
+    query["year_range"] = handle_year_range(request)
 
     return query
 
@@ -35,18 +31,17 @@ def handle_year_range(request):
     end_year = request.args.get("end_year", None)
 
     if start_year and not start_year.isdigit():
-        msg = "Start year ({}) is not integer."\
-                .format(start_year)
+        msg = "Start year ({}) is not integer.".format(start_year)
         abort(400, message=msg)
     if end_year and not end_year.isdigit():
-        msg = "End year ({}) is not integer."\
-                .format(end_year)
+        msg = "End year ({}) is not integer.".format(end_year)
         abort(400, message=msg)
 
     if start_year and end_year:
         if start_year > end_year:
-            msg = "Start year specified ({}) must be less than or equal to end year ({})."\
-                .format(start_year, end_year)
+            msg = "Start year specified ({}) must be less than or equal to end year ({}).".format(
+                start_year, end_year
+            )
             abort(400, message=msg)
 
     return {"start": start_year, "end": end_year}
@@ -59,10 +54,7 @@ def get_or_fail(name, dictionary):
     if thing is not None:
         return thing
 
-    msg = "{} is not valid. Try one of: {}"\
-        .format(
-            name,
-            list(dictionary.keys()))
+    msg = "{} is not valid. Try one of: {}".format(name, list(dictionary.keys()))
     abort(400, message=msg)
 
 
@@ -76,8 +68,13 @@ def infer_levels(query, entities):
 
         entity_config = entities.get(arg_query["type"], None)
         if entity_config is None:
-            abort(400, "Cannot find entity type '{}'. Query:\n\
-                  {}".format(arg_query["type"], arg_query["value"], query))
+            abort(
+                400,
+                "Cannot find entity type '{}'. Query:\n\
+                  {}".format(
+                    arg_query["type"], arg_query["value"], query
+                ),
+            )
 
         classification = entity_config["classification"]
 
@@ -88,8 +85,13 @@ def infer_levels(query, entities):
         if "level" not in arg_query:
             entry = classification.get_level_by_id(arg_query["value"])
             if entry is None:
-                abort(400, "Cannot find {} object with id {}. Query:\n\
-                      {}".format(arg_query["type"], arg_query["value"], query))
+                abort(
+                    400,
+                    "Cannot find {} object with id {}. Query:\n\
+                      {}".format(
+                        arg_query["type"], arg_query["value"], query
+                    ),
+                )
             arg_query["level"] = entry
 
     return query
@@ -101,8 +103,11 @@ def match_query(query, datasets, endpoints):
     dataset_conf = datasets[query["dataset"]]
 
     if query["result"]["level"] is None:
-        abort(400, "You have not specified a result level(?level=foo).",
-              payload=dict(query=query, dataset_conf=dataset_conf))
+        abort(
+            400,
+            "You have not specified a result level(?level=foo).",
+            payload=dict(query=query, dataset_conf=dataset_conf),
+        )
 
     slices = dataset_conf["slices"]
     filtered_slices = {}
@@ -122,15 +127,21 @@ def match_query(query, datasets, endpoints):
             result_name = query["result"]["name"]
             result_level = query["result"]["level"]
             levels_available = slice_conf["levels"][result_name]
-            if(result_level in levels_available):
+            if result_level in levels_available:
                 filtered_slices[slice_name] = slice_conf
 
     if len(filtered_slices) == 0:
-        abort(400, "There are no matching slices for your query in this dataset.",
-              payload=dict(query=query, dataset_conf=dataset_conf))
+        abort(
+            400,
+            "There are no matching slices for your query in this dataset.",
+            payload=dict(query=query, dataset_conf=dataset_conf),
+        )
     elif len(filtered_slices) == 2:
-        abort(400, "There too many matching slices for your query in this dataset.",
-              payload=dict(query=query, dataset_conf=dataset_conf))
+        abort(
+            400,
+            "There too many matching slices for your query in this dataset.",
+            payload=dict(query=query, dataset_conf=dataset_conf),
+        )
 
     # We found the correct data slice!
     matched_slice_name = list(filtered_slices.keys())[0]
@@ -150,8 +161,13 @@ def interpret_query(query, entities, datasets, endpoints):
     query = copy.deepcopy(query)
 
     if query["endpoint"] not in endpoints:
-        abort(400, "{} is not a valid endpoint. Query:\n\
-              {}".format(query["endpoint"], query))
+        abort(
+            400,
+            "{} is not a valid endpoint. Query:\n\
+              {}".format(
+                query["endpoint"], query
+            ),
+        )
 
     endpoint = endpoints[query["endpoint"]]
     dataset = datasets[endpoint["dataset"]]
@@ -165,7 +181,10 @@ def interpret_query(query, entities, datasets, endpoints):
 
         # Is this argument bogus?
         if arg_conf is None:
-            abort(400, "{} is not a valid argument name. Query: {}".format(arg_name, query))
+            abort(
+                400,
+                "{} is not a valid argument name. Query: {}".format(arg_name, query),
+            )
 
         # Fill in level
         arg_query["type"] = arg_conf["type"]
@@ -215,7 +234,7 @@ def register_endpoints(app, entities, data_slices, endpoints, api_metadata=[]):
         app.add_url_rule(
             endpoint_config["url_pattern"],
             endpoint=endpoint_name,
-            view_func=endpoint_handler_func
+            view_func=endpoint_handler_func,
         )
 
     return app

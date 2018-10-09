@@ -10,7 +10,7 @@ def add_preamble(file_name, key="data"):
         network = json.loads(f.read(), object_pairs_hook=OrderedDict)
         f.seek(0)
         f.truncate()
-        f.write(json.dumps({key: network}, indent=4, separators=(',', ': ')))
+        f.write(json.dumps({key: network}, indent=4, separators=(",", ": ")))
 
 
 def strip_preamble(file_name, key="data"):
@@ -18,7 +18,7 @@ def strip_preamble(file_name, key="data"):
         data = json.loads(f.read(), object_pairs_hook=OrderedDict)
         f.seek(0)
         f.truncate()
-        f.write(json.dumps(data[key], indent=4, separators=(',', ': ')))
+        f.write(json.dumps(data[key], indent=4, separators=(",", ": ")))
 
 
 def json_read(file_name):

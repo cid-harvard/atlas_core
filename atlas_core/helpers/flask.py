@@ -21,7 +21,7 @@ class APIError(Exception):
         rv = {}
         rv["payload"] = dict(self.payload or ())
         rv["status_code"] = self.status_code
-        #rv["headers"] = self.headers
+        # rv["headers"] = self.headers
         rv["message"] = self.message
         return {"errors": rv}
 
@@ -45,6 +45,7 @@ def abort(status_code, message=None, payload=None, headers={}):
 
 def headers(headers={}):
     """Decorator that adds custom HTTP headers to the response."""
+
     def decorator(f):
         @wraps(f)
         def inner(*args, **kwargs):
@@ -52,23 +53,24 @@ def headers(headers={}):
             for header, value in headers.items():
                 response.headers[header] = value
             return response
+
         return inner
+
     return decorator
 
 
-def register_config_endpoint(app, entity_types, datasets, endpoints, url_pattern="/config"):
+def register_config_endpoint(
+    app, entity_types, datasets, endpoints, url_pattern="/config"
+):
     """Register an endpoint to /config that shows the dataset / endpoint /
     entity configuration of the current app."""
 
     def config():
-        return jsonify(endpoints=endpoints, datasets=datasets,
-                       entity_types=entity_types)
+        return jsonify(
+            endpoints=endpoints, datasets=datasets, entity_types=entity_types
+        )
 
-    app.add_url_rule(
-        url_pattern,
-        endpoint="config",
-        view_func=config
-    )
+    app.add_url_rule(url_pattern, endpoint="config", view_func=config)
 
     return app
 
