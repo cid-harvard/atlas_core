@@ -346,9 +346,9 @@ class SQLAlchemySliceLookupTest(BaseTestCase):
         class TestModel(BaseModel, IDMixin):
             __tablename__ = "test_model"
             product_id = db.Column(db.Integer)
-            product_level = db.Column(db.Enum("section", "2digit", "4digit"))
+            product_level = db.Column(db.Enum("section", "2digit", "4digit", name="product_level_enum"))
             location_id = db.Column(db.String)
-            location_level = db.Column(db.Enum("city", "department"))
+            location_level = db.Column(db.Enum("city", "department", name="location_level_enum"))
 
             year = db.Column(db.Integer)
             export_value = db.Column(db.Integer)
@@ -501,7 +501,7 @@ class SQLAlchemyClassificationTest(BaseTestCase):
 
             id = db.Column(db.Integer, primary_key=True)
             code = db.Column(db.Unicode(25))
-            level = db.Column(db.Enum("top", "mid", "low", "bottom"))
+            level = db.Column(db.Enum("top", "mid", "low", "bottom", name="level_enum"))
             name = db.Column(db.String)
             parent_id = db.Column(db.Integer)
 
