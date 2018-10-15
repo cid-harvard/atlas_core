@@ -1,7 +1,6 @@
 from flask import make_response, jsonify
 
 from functools import wraps
-from json import JSONEncoder
 
 
 class APIError(Exception):
@@ -73,18 +72,3 @@ def register_config_endpoint(
     app.add_url_rule(url_pattern, endpoint="config", view_func=config)
 
     return app
-
-
-class ForgivingJSONEncoder(JSONEncoder):
-    """If object has a to_json property, use that. Otherwise try to do a
-    regular json encode. If that fails, return the repr() of the object as a
-    string."""
-
-    def default(self, obj):
-        if hasattr(obj, "to_json"):
-            return obj.to_json()
-        else:
-            try:
-                return super(ForgivingJSONEncoder, self).default(obj)
-            except TypeError:
-                return repr(obj)
