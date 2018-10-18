@@ -1,9 +1,8 @@
-from flask import jsonify
-
 from .flask import abort
+from ..interfaces import ISchemaStrategy
 
 
-def marshal(schema, data, json=True, many=None):
+def marshal(schema, data):
     """Shortcut to marshal a lima schema and dump out a flask json response, or
     raise an APIError with appropriate messages otherwise."""
 
@@ -14,7 +13,12 @@ def marshal(schema, data, json=True, many=None):
             400, "Failed to serialize data", payload={"orig_exception": str(exc)}
         )
 
-    if json:
-        return jsonify(data=serialization_result)
-    else:
-        return serialization_result
+    return serialization_result
+
+
+class LimaSchema(ISchemaStrategy):
+    def __init__(self, schema):
+        self.schema = schema
+
+    def reshape(self, data):
+        return marshal(self.schema, data)

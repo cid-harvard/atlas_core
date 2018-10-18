@@ -1,6 +1,8 @@
-from flask import make_response, jsonify
+from flask import make_response
 
 from functools import wraps
+
+from ..serializers import get_serializer, ensure_simple
 
 
 class APIError(Exception):
@@ -18,7 +20,7 @@ class APIError(Exception):
 
     def to_dict(self):
         rv = {}
-        rv["payload"] = dict(self.payload or ())
+        rv["payload"] = dict(ensure_simple(self.payload) or ())
         rv["status_code"] = self.status_code
         # rv["headers"] = self.headers
         rv["message"] = self.message
@@ -30,7 +32,7 @@ class APIError(Exception):
 
 def handle_api_error(error):
     """Error handler for flask that handles :py:class:`~APIError` instances."""
-    response = jsonify(error.to_dict())
+    response = get_serializer().serialize(error.to_dict())
     response.status_code = error.status_code
     if error.headers:
         for key, value in error.headers.items():
@@ -65,8 +67,10 @@ def register_config_endpoint(
     entity configuration of the current app."""
 
     def config():
-        return jsonify(
-            endpoints=endpoints, datasets=datasets, entity_types=entity_types
+        return get_serializer().serialize(
+            data=ensure_simple(
+                dict(endpoints=endpoints, datasets=datasets, entity_types=entity_types)
+            )
         )
 
     app.add_url_rule(url_pattern, endpoint="config", view_func=config)

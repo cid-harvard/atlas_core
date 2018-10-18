@@ -1,10 +1,10 @@
-from flask import Flask
-from flask import cli
+from flask import Flask, cli
 
 from werkzeug.contrib.profiler import ProfilerMiddleware
 
 from .core import db
 from .helpers.flask import APIError, handle_api_error
+from .serializers import JsonifySerializer
 
 
 def load_config(app, overrides={}):
@@ -70,7 +70,15 @@ def create_app(
     if app.config.get("CATCH_API_EXCEPTIONS", True):
         app.errorhandler(APIError)(handle_api_error)
 
+    # For flask's jsonify
     if custom_json_encoder:
         app.json_encoder = custom_json_encoder
+
+    # Register custom serializers like json, csv, msgpack, bson etc to use with
+    # helpers.serialize()
+    app.serializers = {"json": JsonifySerializer()}
+
+    if "default_serializer" not in app.config:
+        app.config["default_serializer"] = "json"
 
     return app

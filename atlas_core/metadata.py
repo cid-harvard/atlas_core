@@ -1,7 +1,7 @@
-from flask import request, jsonify
+from flask import request
 
-from .helpers.lima import marshal
 from .helpers.flask import abort
+from .serializers import get_serializer
 
 
 def make_metadata_api(classification, metadata_schema, api_metadata={}):
@@ -19,12 +19,13 @@ def make_metadata_api(classification, metadata_schema, api_metadata={}):
         """
         if entity_id is not None:
             q = classification.get_by_id(entity_id)
-            return marshal(metadata_schema, [q], many=False)
+            data = metadata_schema.reshape([q])[0]
         else:
             level = request.args.get("level", None)
             q = classification.get_all(level=level)
-            data = marshal(metadata_schema, q, json=False)
-            return jsonify(data=data, api_metadata=api_metadata)
+            data = metadata_schema.reshape(q)
+
+        return get_serializer().serialize(data=data, api_metadata=api_metadata)
 
     def hierarchy_api():
         """Get the mapping of ids from a level of a classification to another
@@ -49,7 +50,7 @@ def make_metadata_api(classification, metadata_schema, api_metadata={}):
                 payload=dict(levels=classification.levels),
             )
 
-        return jsonify(data=mapping)
+        return get_serializer().serialize(data=mapping, api_metadata=api_metadata)
 
     return metadata_api, hierarchy_api
 
@@ -65,10 +66,10 @@ def register_metadata_apis(
     for entity_name, settings in entities.items():
 
         # Generate handler function for entity
-        # Get custom schema if available
-        our_metadata_schema = settings.get("schema", metadata_schema)
+        # Get entity-specific schema if specified by user
+        metadata_schema = settings.get("schema", metadata_schema)
         metadata_api_func, hierarchy_api_func = make_metadata_api(
-            settings["classification"], our_metadata_schema, api_metadata
+            settings["classification"], metadata_schema, api_metadata
         )
 
         # Singular endpoint e.g. /entity/7

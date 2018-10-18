@@ -1,5 +1,4 @@
 from .interfaces import ILookupStrategy
-from .helpers import lima
 
 from sqlalchemy import inspect
 from .core import db
@@ -8,9 +7,8 @@ from .core import db
 class SQLAlchemyLookup(ILookupStrategy):
     """Look up a query in an SQLAlchemy model."""
 
-    def __init__(self, model, schema=None):
+    def __init__(self, model):
         self.model = model
-        self.schema = schema
 
     def get_column_by_name(self, name):
         column = getattr(self.model, name, None)
@@ -23,7 +21,7 @@ class SQLAlchemyLookup(ILookupStrategy):
     def get_all_model_columns(self):
         return [x for x in inspect(self.model).columns]
 
-    def fetch(self, slice_def, query, json=True):
+    def fetch(self, slice_def, query):
         # Build a lost of predicates
         # e.g. location_id==5 AND product_level=='4digit'
 
@@ -68,21 +66,20 @@ class SQLAlchemyLookup(ILookupStrategy):
             end_predicate = year_column <= query["year_range"]["end"]
             filter_predicates.append(end_predicate)
 
-        q = list(
+        q = (
             db.session.query(*self.get_all_model_columns())
             .filter(*filter_predicates)
             .all()
         )
 
-        return lima.marshal(self.schema, q, json=json)
+        return q
 
 
 class DataFrameLookup(ILookupStrategy):
     """Look up a query in a pandas dataframe."""
 
-    def __init__(self, df, schema=None):
+    def __init__(self, df):
         self.df = df
-        self.schema = schema
 
     def fetch(self, slice_def, query):
         raise NotImplementedError()
