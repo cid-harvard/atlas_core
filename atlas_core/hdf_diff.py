@@ -109,11 +109,18 @@ def row_count_checks(table, file_1, file_2):
             puts(colored.yellow(f"Difference: {diff:,} rows"))
 
 
+def hdf_diff(path_1, path_2):
+    puts(colored.magenta("\n\n** COMPARING HDF5 FILES **"))
+    puts(colored.magenta(f"{path_1}, {path_2} \n"))
+
+    files = (HDFInfo(path_1), HDFInfo(path_2))
+    common_keys = key_check(*files)
+    compare_tables(common_keys, *files)
+
+
 if __name__ == "__main__":
     if len(sys.argv) != 3:
         print("Usage: python hdf_diff.py <file_1.h5> <file_2.h5>")
         sys.exit(1)
 
-    files = (HDFInfo(sys.argv[1]), HDFInfo(sys.argv[2]))
-    common_keys = key_check(*files)
-    compare_tables(common_keys, *files)
+    hdf_diff(sys.argv[1], sys.argv[2])
