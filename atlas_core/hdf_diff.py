@@ -39,29 +39,34 @@ def key_check(file_1, file_2):
             key_diff(file_2)
 
     with indent(4, quote=colored.cyan("> ")):
-        puts(colored.cyan(f"Common keys:"))
-        with indent(4, quote=colored.cyan("- ")):
+        puts(colored.green("Common keys:"))
+        with indent(4, quote=colored.green("- ")):
             for key in common_keys:
-                puts(colored.cyan(key))
+                puts(colored.green(key))
 
     return common_keys
 
 
 def compare_tables(common_keys, file_1, file_2):
+    puts(colored.cyan("\n\n** COMPARING COMMON TABLES **"))
     for key in common_keys:
-        puts(colored.cyan(f"Comparing {key}:"))
+        puts(colored.cyan(f"\nComparing {key}:"))
         with indent(4, quote=colored.cyan("> ")):
             column_checks(key, file_1, file_2)
-            # shape_checks(*tables)
+            row_count_checks(key, file_1, file_2)
 
 
-def column_checks(table, file_1, file_2):
+def column_checks(table, file_1, file_2, list_exact_common=False):
     columns_1 = set(file_1.hdf[table].columns)
     columns_2 = set(file_2.hdf[table].columns)
 
     if columns_1 == columns_2:
         puts(colored.green("Tables have same columns"))
-        common_columns = columns_1
+
+        # Return early if we don't need to list the common columns if exact
+        if not list_exact_common:
+            return columns_1
+
     else:
         puts(colored.red("Tables contain different keys"))
         file_1.unique_columns[table] = file_1.keys - file_2.keys
@@ -89,8 +94,19 @@ def column_checks(table, file_1, file_2):
     return common_columns
 
 
-def shape_checks(table_1, table_2):
-    ...
+def row_count_checks(table, file_1, file_2):
+    rows_1 = len(file_1.hdf[table].index)
+    rows_2 = len(file_2.hdf[table].index)
+    diff = abs(rows_1 - rows_2)
+
+    if rows_1 == rows_2:
+        puts(colored.green("Tables have same row counts"))
+    else:
+        puts(colored.yellow("Tables have different row counts:"))
+        with indent(4, quote=colored.yellow("> ")):
+            puts(colored.yellow(f"{file_1.name}: {rows_1:,} rows"))
+            puts(colored.yellow(f"{file_2.name}: {rows_2:,} rows"))
+            puts(colored.yellow(f"Difference: {diff:,} rows"))
 
 
 if __name__ == "__main__":
