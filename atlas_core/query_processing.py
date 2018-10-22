@@ -1,8 +1,9 @@
 import copy
 
-from flask import request, jsonify
+from flask import request
 
 from .helpers.flask import abort
+from .serializers import get_serializer
 
 
 def request_to_query(request):
@@ -204,7 +205,7 @@ def interpret_query(query, entities, datasets, endpoints):
     return query
 
 
-def flask_handle_query(entities, datasets, endpoints):
+def flask_handle_query(entities, datasets, endpoints, extra_fields={}, serializer=None):
     """Function to use to bind to a flask route, that goes from a HTTP request
     to a query, to a response with data. """
 
@@ -215,11 +216,24 @@ def flask_handle_query(entities, datasets, endpoints):
     query_with_levels = infer_levels(query_interpreted, entities)
     query_full = match_query(query_with_levels, datasets, endpoints)
 
-    # Use query object to look up the data needed and return the response
+    # Use query object to look up the data needed
     dataset = datasets[query_full["dataset"]]
     data_slice = dataset["slices"][query_full["slice"]]
-    lookup_strategy = data_slice["lookup_strategy"]
-    return lookup_strategy.fetch(data_slice, query_full, json=False)
+
+    # Fetch data
+    data = data_slice["lookup_strategy"].fetch(data_slice, query_full)
+
+    # Process it with the api schema
+    data = data_slice["schema"].reshape(data)
+
+    # Add in extra stuff
+    data = dict(data=data)
+    data.update(extra_fields)
+
+    # Serialize it
+    data = get_serializer(serializer).serialize(data)
+
+    return data
 
 
 def register_endpoints(app, entities, data_slices, endpoints, api_metadata=[]):
@@ -227,8 +241,16 @@ def register_endpoints(app, entities, data_slices, endpoints, api_metadata=[]):
     api_metadata = {x: app.config[x] for x in api_metadata}
 
     def endpoint_handler_func(*args, **kwargs):
-        data = flask_handle_query(entities, data_slices, endpoints)
-        return jsonify(data=data, api_metadata=api_metadata)
+        """Request context or app context specific stuff should happen in here,
+        other stuff in flask_handle_query."""
+
+        return flask_handle_query(
+            entities,
+            data_slices,
+            endpoints,
+            extra_fields=api_metadata,
+            serializer=request.args.get("serializer", None),
+        )
 
     for endpoint_name, endpoint_config in endpoints.items():
         app.add_url_rule(

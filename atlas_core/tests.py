@@ -1,11 +1,11 @@
 import json
 import copy
 
-from flask import request, jsonify
+from flask import request
 import pytest
 import marshmallow as ma
 
-from . import create_app
+from . import create_app, interfaces
 from .core import db
 from .classification import SQLAlchemyClassification
 from .helpers.flask import APIError
@@ -21,7 +21,9 @@ from .query_processing import (
     flask_handle_query,
     register_endpoints,
 )
+from .metadata import register_metadata_apis
 from .slice_lookup import SQLAlchemyLookup
+from .helpers.flask import register_config_endpoint
 
 
 class ProductClassificationTest(object):
@@ -30,6 +32,9 @@ class ProductClassificationTest(object):
             return "4digit"
         else:
             return None
+
+    def get_all(self, level=None):
+        return [{"id": 2, "name": "cars"}, {"id": 4, "name": "trucks"}]
 
 
 class LocationClassificationTest(object):
@@ -40,12 +45,14 @@ class LocationClassificationTest(object):
             return None
 
 
-class SQLAlchemyLookupStrategyTest(object):
-    def fetch(self, slice_def, query, json=True):
-        if json:
-            return jsonify(data=[{"a": 1}, {"b": 2}, {"c": 3}])
-        else:
-            return [{"a": 1}, {"b": 2}, {"c": 3}]
+class SQLAlchemyLookupStrategyTest(interfaces.ILookupStrategy):
+    def fetch(self, slice_def, query):
+        return [{"a": 1}, {"b": 2}, {"c": 3}]
+
+
+class LimaSchemaTest(interfaces.ISchemaStrategy):
+    def reshape(self, data):
+        return data
 
 
 entities = {
@@ -79,6 +86,7 @@ datasets = {
             "product_year": {
                 "levels": {"product": ["section", "4digit"]},
                 "lookup_strategy": SQLAlchemyLookupStrategyTest(),
+                "schema": LimaSchemaTest(),
             }
         },
     },
@@ -92,6 +100,7 @@ datasets = {
             "country_product_year": {
                 "levels": {"location": ["country"], "product": ["section", "4digit"]},
                 "lookup_strategy": SQLAlchemyLookupStrategyTest(),
+                "schema": LimaSchemaTest(),
             },
             "department_product_year": {
                 "levels": {
@@ -99,6 +108,7 @@ datasets = {
                     "product": ["section", "4digit"],
                 },
                 "lookup_strategy": SQLAlchemyLookupStrategyTest(),
+                "schema": LimaSchemaTest(),
             },
         },
     },
@@ -331,12 +341,12 @@ class QueryBuilderTest(BaseTestCase):
             # have to pass it in
             api_response = flask_handle_query(entities, datasets, endpoints)
 
-            assert api_response == [{"a": 1}, {"b": 2}, {"c": 3}]
+            assert api_response.json["data"] == [{"a": 1}, {"b": 2}, {"c": 3}]
 
         with self.app.test_request_context("/data/product/?level=4digit"):
             api_response = flask_handle_query(entities, datasets, endpoints)
 
-            assert api_response == [{"a": 1}, {"b": 2}, {"c": 3}]
+            assert api_response.json["data"] == [{"a": 1}, {"b": 2}, {"c": 3}]
 
 
 class SQLAlchemySliceLookupTest(BaseTestCase):
@@ -346,9 +356,13 @@ class SQLAlchemySliceLookupTest(BaseTestCase):
         class TestModel(BaseModel, IDMixin):
             __tablename__ = "test_model"
             product_id = db.Column(db.Integer)
-            product_level = db.Column(db.Enum("section", "2digit", "4digit", name="product_level_enum"))
+            product_level = db.Column(
+                db.Enum("section", "2digit", "4digit", name="product_level_enum")
+            )
             location_id = db.Column(db.String)
-            location_level = db.Column(db.Enum("city", "department", name="location_level_enum"))
+            location_level = db.Column(
+                db.Enum("city", "department", name="location_level_enum")
+            )
 
             year = db.Column(db.Integer)
             export_value = db.Column(db.Integer)
@@ -432,31 +446,31 @@ class SQLAlchemySliceLookupTest(BaseTestCase):
             },
             "year_range": {"start": None, "end": None},
         }
-        lookup = SQLAlchemyLookup(self.model, self.schema)
+        lookup = SQLAlchemyLookup(self.model)
 
-        result = lookup.fetch(self.slice_def, query, json=False)
+        result = lookup.fetch(self.slice_def, query)
         expected = [
             {"year": 2007, "location_id": "1", "product_id": 1, "export_value": 1000},
             {"year": 2008, "location_id": "1", "product_id": 1, "export_value": 1100},
             {"year": 2007, "location_id": "2", "product_id": 1, "export_value": 2000},
             {"year": 2008, "location_id": "2", "product_id": 1, "export_value": 2100},
         ]
-        assert result.data == expected
+        assert self.schema.dump(result).data == expected
 
         query["arguments"]["product"]["value"] = 2
-        result = lookup.fetch(self.slice_def, query, json=False)
+        result = lookup.fetch(self.slice_def, query)
         expected = [
             {"year": 2007, "location_id": "1", "product_id": 2, "export_value": 100},
             {"year": 2008, "location_id": "1", "product_id": 2, "export_value": 110},
             {"year": 2007, "location_id": "2", "product_id": 2, "export_value": 200},
             {"year": 2008, "location_id": "2", "product_id": 2, "export_value": 210},
         ]
-        assert result.data == expected
+        assert self.schema.dump(result).data == expected
 
         query["arguments"]["product"]["value"] = 9999
-        result = lookup.fetch(self.slice_def, query, json=False)
+        result = lookup.fetch(self.slice_def, query)
         expected = []
-        assert result.data == expected
+        assert self.schema.dump(result).data == expected
 
         query = {
             "endpoint": "product",
@@ -469,10 +483,10 @@ class SQLAlchemySliceLookupTest(BaseTestCase):
             },
             "year_range": {"start": None, "end": None},
         }
-        lookup = SQLAlchemyLookup(self.model, self.schema)
+        lookup = SQLAlchemyLookup(self.model)
         # Should return results only filtered by result_level which is 4digit
-        result = lookup.fetch(self.slice_def, query, json=False)
-        assert len(result.data) == 16
+        result = lookup.fetch(self.slice_def, query)
+        assert len(result) == 16
 
 
 class RegisterAPIsTest(BaseTestCase):
@@ -585,3 +599,44 @@ class SQLAlchemyClassificationTest(BaseTestCase):
 
         with pytest.raises(ValueError):
             self.classification.aggregation_mapping("top", "bottom")
+
+
+class JSONEncodingTest(BaseTestCase):
+    def setUp(self):
+        self.app = create_app(
+            {
+                # "SQLALCHEMY_DATABASE_URI": "sqlite://",
+                "TESTING": True
+            }
+        )
+        self.app = register_endpoints(self.app, entities, datasets, endpoints)
+        self.app.config["random_config"] = "yes"
+        self.app = register_metadata_apis(
+            self.app, entities, LimaSchemaTest(), api_metadata=["random_config"]
+        )
+        self.app = register_config_endpoint(
+            self.app, entities, datasets, endpoints, url_pattern="/config"
+        )
+        self.test_client = self.app.test_client()
+
+    def test_config_endpoint(self):
+        """Because this has complex objects stuffed in there"""
+        response = self.test_client.get("/config")
+        assert response.status_code == 200
+        assert set(response.json["data"].keys()) == set(
+            ("datasets", "endpoints", "entity_types")
+        )
+
+    def test_api_error(self):
+        """Because this has complex objects stuffed in there"""
+        response = self.test_client.get("/data/product/?level=nonexistent")
+        assert response.status_code == 400
+        assert set(response.json["errors"].keys()) == set(
+            ("message", "payload", "status_code")
+        )
+
+    def test_metadata(self):
+        """Because this has complex objects stuffed in there"""
+        response = self.test_client.get("/metadata/hs_product/")
+        assert response.status_code == 200
+        assert len(response.json["data"]) == 2

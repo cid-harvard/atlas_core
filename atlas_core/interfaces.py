@@ -16,9 +16,6 @@ class IClassification(ABC):
         city?"""
         raise NotImplementedError()
 
-    def to_json(self):
-        return str(self)
-
     """
     def get_classification(self, level=none):
         q = self.model.query
@@ -40,5 +37,14 @@ class ILookupStrategy(ABC):
     def fetch(self, slice_def, query):
         pass
 
-    def to_json(self):
-        return str(self)
+
+class ISchemaStrategy(ABC):
+    @abstractmethod
+    def reshape(self, data):
+        pass
+
+
+class ISerializerStrategy(ABC):
+    @abstractmethod
+    def serialize(self, *args, **kwargs):
+        pass
