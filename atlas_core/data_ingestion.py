@@ -130,10 +130,11 @@ def process_dataset(dataset, year_range=(1700, 2200)):
 
     # Gather each facet dataset (e.g. DY, PY, DPY variables from DPY dataset)
     facet_outputs = {}
-    for facet_fields, aggregations in dataset["facets"].items():
-        puts("Working on facet: {}".format(facet_fields))
+    for facet_name, settings in dataset["facets"].items():
+        facet_fields = settings["facet_fields"]
+        aggregations = settings["aggregations"]
         facet = df.groupby(list(facet_fields)).agg(aggregations)
-        facet_outputs[facet_fields] = facet
+        facet_outputs[facet_name] = facet
 
     # Perform aggregations by classification (e.g. aggregate 4digit products to
     # 2digit and locations to regions, or both, etc)
@@ -143,8 +144,9 @@ def process_dataset(dataset, year_range=(1700, 2200)):
     ).items():
 
         # Here is the output dataframe we now want to aggregate up
-        facet = clagg_settings["facet"]
-        base_df = facet_outputs[facet].reset_index()
+        source_name = clagg_settings["source"]
+        facet = dataset["facets"][source_name]["facet_fields"]
+        base_df = facet_outputs[source_name].reset_index()
 
         # First, find out new higher_level ids, e.g. each product_id entry
         # should be replaced from the 4digit id to its 2digit parent etc.
@@ -177,7 +179,7 @@ def process_dataset(dataset, year_range=(1700, 2200)):
 
             # Rename column so that when we join the aggregation table we don't
             # get a duplicate column name accidentally
-            assert "parent_id" not in facet_outputs[facet].columns
+            assert "parent_id" not in facet_outputs[source_name].columns
             aggregation_table.columns = ["parent_id"]
 
             # Convert the new ID field into a categorical type
