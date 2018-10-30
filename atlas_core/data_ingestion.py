@@ -144,13 +144,13 @@ def process_dataset(dataset, year_range=(1700, 2200)):
     ).items():
 
         # Here is the output dataframe we now want to aggregate up
-        source_name = clagg_settings["source"]
+        source_name = clagg_settings["source_facet"]
         facet = dataset["facets"][source_name]["facet_fields"]
         base_df = facet_outputs[source_name].reset_index()
 
         # First, find out new higher_level ids, e.g. each product_id entry
         # should be replaced from the 4digit id to its 2digit parent etc.
-        for field, agg_level_to in clagg_settings["agg_fields"].items():
+        for field, agg_level_to in clagg_settings["classification_levels"].items():
 
             # Infer classification table and level we're aggregating from, from
             # field name
@@ -199,7 +199,7 @@ def process_dataset(dataset, year_range=(1700, 2200)):
 
         # Now that we have the new parent ids for every field, perform
         # aggregation
-        agg_df = base_df.groupby(list(facet)).agg(clagg_settings["agg_params"])
+        agg_df = base_df.groupby(list(facet)).agg(clagg_settings["aggregations"])
 
         # Add it to the list of classification aggregation results!
         clagg_outputs[clagg_name] = agg_df
