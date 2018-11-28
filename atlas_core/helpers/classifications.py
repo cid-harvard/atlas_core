@@ -10,6 +10,7 @@ def classification_to_pandas(
         "in_rankings",
         "reported_serv",
         "reported_serv_recent",
+        "iso2",
     ],
     **kwargs,
 ):
