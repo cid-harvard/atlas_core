@@ -1,5 +1,4 @@
 from atlas_core import db
-from .helpers.classifications import classification_to_pandas
 from multiprocessing import Pool
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import create_engine
@@ -115,6 +114,11 @@ def hdf_to_postgres(
     )
 
     # Copy classifications first, not multiprocessed
+    def coerce_classification(
+        df, column_map={"index": "id", "name": "name_en"}, drop_cols=[], **kwargs
+    ):
+        return df.rename(columns=column_map).drop(columns=drop_cols)
+
     for class_table in classifications:
         # Order of data_formatters list matters here
         copy_worker(
@@ -122,7 +126,7 @@ def hdf_to_postgres(
             engine_args,
             engine_kwargs,
             maintenance_work_mem=maintenance_work_mem,
-            data_formatters=[classification_to_pandas, cast_pandas],
+            data_formatters=[coerce_classification, cast_pandas],
         )
 
     # Use multiprocessing for the larger tables once classifications are complete
