@@ -40,7 +40,7 @@ def import_data_sqlite(
         try:
             if key.startswith("/classifications/"):
                 df = pd.read_hdf(file_name, key=key)
-                df = classification_to_pandas(df)
+                df = df.rename(columns={"index": "id", "name": "name_en"})
                 df.to_sql(
                     table_name,
                     engine,
@@ -102,8 +102,7 @@ def import_data(
         levels of data (e.g. 2digit and 4digit) get loaded into a single table
 
     In addition, anything under the /classifications/ path in the HDF store
-    gets treated specially as a classification, and gets run through the
-    classification_to_pandas() function.
+    gets treated specially as a classification.
 
     Postgres-specific:
     ------------------
