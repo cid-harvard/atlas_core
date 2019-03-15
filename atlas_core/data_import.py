@@ -1,6 +1,5 @@
 """Import from an ingested .hdf file to an sql database."""
 from sqlalchemy.exc import SQLAlchemyError
-from .helpers.classifications import classification_to_pandas
 
 
 def import_data_sqlite(
