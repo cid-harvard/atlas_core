@@ -39,7 +39,15 @@ def import_data_sqlite(
         try:
             if key.startswith("/classifications/"):
                 df = pd.read_hdf(file_name, key=key)
-                df = df.rename(columns={"index": "id", "name": "name_en"})
+
+                # Make sure 'name_en' is populated by renaming 'name' or dropping 'name'
+                # if 'name_en' already exists
+                if "name_en" in df.columns:
+                    df = df.rename(columns={"index": "id"}).drop(
+                        columns=["name"], errors="ignore"
+                    )
+                else:
+                    df = df.rename(columns={"index": "id", "name": "name_en"})
                 df.to_sql(
                     table_name,
                     engine,
