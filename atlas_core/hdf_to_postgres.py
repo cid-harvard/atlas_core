@@ -114,9 +114,7 @@ def hdf_to_postgres(
     )
 
     # Copy classifications first, not multiprocessed
-    def coerce_classification(
-        df, column_map={"index": "id", "name": "name_en"}, drop_cols=[], **kwargs
-    ):
+    def coerce_classification(df, column_map={"index": "id"}, drop_cols=[], **kwargs):
         return df.rename(columns=column_map).drop(columns=drop_cols)
 
     for class_table in classifications:
