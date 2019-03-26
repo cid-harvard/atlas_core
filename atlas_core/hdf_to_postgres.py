@@ -196,6 +196,15 @@ def multiload(
     # Coerce into a valid SQL db name
     new_db_name = coerce_data_version(new_db_name)
 
+    # Log info about database copy setup
+    logger.info("-----------------------------------")
+    logger.info("Database Configuration")
+    logger.info(f"Driver: {engine.url.drivername}")
+    logger.info(f"Host: {engine.url.host}")
+    logger.info(f"Port: {engine.url.port}")
+    logger.info(f"Destination: {new_db_name}")
+    logger.info("-----------------------------------")
+
     # Try to create pg database. Connect using the default URI because in
     # postgres you can't connect to a DB that doesn't exist yet, so we have to
     # start with one that already exists.
@@ -205,9 +214,7 @@ def multiload(
         conn.execute(f'CREATE DATABASE "{new_db_name}"')
         logger.info(f"Created database {new_db_name}")
     except SQLAlchemyError:
-        logger.info(
-            f"Error creating database {new_db_name}. It probably already exists"
-        )
+        logger.info(f"Error creating database {new_db_name}. It may already exist.")
     finally:
         conn.close()
 
