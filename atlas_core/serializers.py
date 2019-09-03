@@ -76,6 +76,7 @@ class MsgpackSerializer(ISerializerStrategy):
 
     def __init__(self):
         import msgpack
+
         self.msgpack = msgpack
 
     def serialize(self, *args, **kwargs):
@@ -92,9 +93,9 @@ class MsgpackSerializer(ISerializerStrategy):
 
 
 class UjsonSerializer(ISerializerStrategy):
-
     def __init__(self):
         import ujson
+
         self.ujson = ujson
 
     def serialize(self, *args, **kwargs):
@@ -114,3 +115,47 @@ class UjsonSerializer(ISerializerStrategy):
             + "\n",
             mimetype="application/json",
         )
+
+
+class CsvSerializer(ISerializerStrategy):
+    def __init__(self):
+        import csv
+        import pandas as pd
+        from io import StringIO
+
+        self.stringio = StringIO
+        self.pd = pd
+        self.csv = csv
+
+    def serialize(self, *args, **kwargs):
+        if args and kwargs:
+            raise TypeError("behavior undefined when passed both args and kwargs")
+        elif len(args) == 1:  # single args are passed directly to dumps()
+            data = args[0]
+        elif "data" in kwargs.keys():  # data passed through kwarg passed to dumps()
+            data = kwargs["data"]
+        else:
+            data = args or kwargs
+
+        return current_app.response_class(
+            self.create_file_object(data).getvalue(), mimetype="text/csv"
+        )
+
+    def create_file_object(self, data):
+        """
+        Writes pandas dataframe to an in-memory StringIO file object. Adapted from
+        https://gist.github.com/mangecoeur/1fbd63d4758c2ba0c470#gistcomment-2086007
+
+        Parameters
+        ----------
+        data: serializable data
+
+        Returns
+        -------
+        file_object: StringIO
+        """
+        df = self.pd.DataFrame(data)
+        file_object = self.stringio()
+        df.to_csv(file_object, index=False)
+        file_object.seek(0)
+        return file_object
