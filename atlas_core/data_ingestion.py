@@ -121,11 +121,11 @@ def process_dataset(dataset):
         )
 
         df[field_name + "_id"] = df[field_name + "_id"].astype(
-            CategoricalDtype(categories=classification_table.index.values)
+            pd.CategoricalDtype(categories=classification_table.index.values)
         )
 
     if "year" in df.columns:
-        df["year"] = df["year"].astype(CategoricalDtype(categories=df.year.unique()))
+        df["year"] = df["year"].astype(pd.CategoricalDtype(categories=df.year.unique()))
 
     # Gather each facet dataset (e.g. DY, PY, DPY variables from DPY dataset)
     facet_outputs = {}
