@@ -131,6 +131,11 @@ def process_dataset(dataset):
     facet_outputs = {}
     for facet_fields, aggregations in dataset["facets"].items():
         puts("Working on facet: {}".format(facet_fields))
+
+        # Newer Pandas requires multiple groupby to be list, not tuple
+        if type(facet_fields) == tuple:
+            facet_fields = list(facet_fields)
+
         facet_groupby = df.groupby(facet_fields)
 
         # Do specified aggregations / groupings for each column
@@ -205,6 +210,10 @@ def process_dataset(dataset):
                 .drop(columns=field)
                 .rename(columns={"parent_id": field})
             )
+
+        # Newer Pandas requires multiple groupby to be list, not tuple
+        if type(facet) == tuple:
+            facet = list(facet)
 
         # Now that we have the new parent ids for every field, perform
         # aggregation
