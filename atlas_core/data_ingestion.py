@@ -134,9 +134,9 @@ def process_dataset(dataset):
 
         # Newer Pandas requires multiple groupby to be list, not tuple
         if type(facet_fields) == tuple:
-            facet_fields = list(facet_fields)
-
-        facet_groupby = df.groupby(facet_fields)
+            facet_groupby = df.groupby(list(facet_fields))
+        else:
+            facet_groupby = df.groupby(facet_fields)
 
         # Do specified aggregations / groupings for each column
         # like mean, first, min, rank, etc
@@ -211,13 +211,13 @@ def process_dataset(dataset):
                 .rename(columns={"parent_id": field})
             )
 
-        # Newer Pandas requires multiple groupby to be list, not tuple
-        if type(facet) == tuple:
-            facet = list(facet)
-
         # Now that we have the new parent ids for every field, perform
         # aggregation
-        agg_df = base_df.groupby(facet).agg(clagg_settings["agg_params"])
+        # Newer Pandas requires multiple groupby to be list, not tuple
+        if type(facet) == tuple:
+            agg_df = base_df.groupby(list(facet)).agg(clagg_settings["agg_params"])
+        else:
+            agg_df = base_df.groupby(facet).agg(clagg_settings["agg_params"])
 
         # Add it to the list of classification aggregation results!
         clagg_outputs[clagg_name] = agg_df
