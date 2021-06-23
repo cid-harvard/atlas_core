@@ -200,7 +200,9 @@ def process_dataset(dataset):
             aggregation_table.parent_id = aggregation_table.parent_id.astype(
                 int
             ).astype(
-                "category", values=aggregation_table.parent_id.astype(int).unique()
+                pd.CategoricalDtype(
+                    categories=aggregation_table.parent_id.astype(int).unique()
+                )
             )
 
             # Join aggregation table
