@@ -165,6 +165,8 @@ def process_dataset(dataset):
         # First, find out new higher_level ids, e.g. each product_id entry
         # should be replaced from the 4digit id to its 2digit parent etc.
         for field, agg_level_to in clagg_settings["agg_fields"].items():
+            with indented():
+                puts(f"Aggregating to level {agg_level_to}")
 
             # Infer classification table and level we're aggregating from, from
             # field name
