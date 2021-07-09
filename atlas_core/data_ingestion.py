@@ -5,6 +5,7 @@ from io import StringIO
 
 from clint.textui import puts, indent, colored
 import pandas as pd
+import dask.dataframe as dd
 
 from . import data_assertions as assertions
 
@@ -33,7 +34,7 @@ def merge_ids_from_codes(df, df_merge_on, classification, classification_column)
     return df.merge(code_to_id, left_on=df_merge_on, right_index=True, how="left")
 
 
-def process_dataset(dataset):
+def process_dataset(dataset, year_range=(1700, 2200)):
 
     puts("=" * 80)
     good("Processing a new dataset!")
@@ -49,7 +50,7 @@ def process_dataset(dataset):
     puts("Dataset overview:")
     with indented():
         infostr = StringIO()
-        df.info(buf=infostr, memory_usage=True, null_counts=True)
+        df.info(buf=infostr, memory_usage=True)
         puts(infostr.getvalue())
 
     for field in dataset["facet_fields"]:
@@ -58,16 +59,18 @@ def process_dataset(dataset):
         except AssertionError:
             warn(
                 "Field '{}' has {} missing values.".format(
-                    field, df[field].isnull().sum()
+                    field, df[field].isnull().sum().compute()
                 )
             )
 
+    # TODO: should these be moved earlier?
     # Zero-pad digits of n-digit codes
     for field, length in dataset["digit_padding"].items():
         try:
             assertions.assert_is_zeropadded_string(df[field])
         except AssertionError:
             warn("Field '{}' is not padded to {} digits.".format(field, length))
+<<<<<<< HEAD
             df[field] = df[field].astype(int).astype(str).str.zfill(length)
 
     # Make sure the dataset is rectangularized by the facet fields
@@ -89,11 +92,35 @@ def process_dataset(dataset):
             )
         )
         bad(df[df.duplicated(subset=dataset["facet_fields"], keep=False)])
+=======
+            df[field] = df[field].astype(int).astype(str).str.zfill(length).compute()
+
+    # # Make sure the dataset is rectangularized by the facet fields
+    # try:
+    #     assertions.assert_rectangularized(df, dataset["facet_fields"])
+    # except AssertionError:
+    #     warn(
+    #         "Dataset is not rectangularized on fields {}".format(
+    #             dataset["facet_fields"]
+    #         )
+    #     )
+
+    # try:
+    #     assertions.assert_entities_not_duplicated(df, dataset["facet_fields"])
+    # except AssertionError:
+    #     bad(
+    #         "Dataset has duplicate rows for entity combination: {}".format(
+    #             dataset["facet_fields"]
+    #         )
+    #     )
+    #     bad(df[df.duplicated(subset=dataset["facet_fields"], keep=False)])
+>>>>>>> dask
 
     # Merge in IDs for entity codes
     for field_name, c in dataset["classification_fields"].items():
         classification_table = c["classification"].level(c["level"])
 
+<<<<<<< HEAD
         (
             p_nonmatch_rows,
             p_nonmatch_unique,
@@ -150,6 +177,47 @@ def process_dataset(dataset):
 
         facet = pd.concat(agg_outputs, axis=1)
         facet_outputs[facet_fields] = facet
+=======
+        # (
+        #     p_nonmatch_rows,
+        #     p_nonmatch_unique,
+        #     codes_missing,
+        #     codes_unused,
+        # ) = assertions.matching_stats(df[field_name], classification_table)
+
+        # if p_nonmatch_rows > 0:
+        #     bad("Errors when Merging field {}:".format(field_name))
+        #     with indented():
+        #         puts("Percentage of nonmatching rows: {}".format(p_nonmatch_rows))
+        #         puts("Percentage of nonmatching codes: {}".format(p_nonmatch_unique))
+        #         puts(
+        #             "Codes missing in classification:\n{}".format(
+        #                 codes_missing.reset_index(drop=True)
+        #             )
+        #         )
+        #         puts("Codes unused:\n{}".format(codes_unused.reset_index(drop=True)))
+
+        #     bad("Dropping nonmatching rows.")
+        #     df = df[~df[field_name].isin(codes_missing)]
+
+        field_id = field_name + "_id"
+
+        df = merge_ids_from_codes(df, field_name, classification_table, field_id)
+        df[field_id] = df[field_id].astype(
+            pd.Categorical(classification_table.index.values)
+        )
+
+    if "year" in df.columns:
+        df["year"] = df["year"].astype(pd.Categorical(range(*year_range)))
+
+    # Gather each facet dataset (e.g. DY, PY, DPY variables from DPY dataset)
+    facet_outputs = {}
+    for facet_name, settings in dataset["facets"].items():
+        facet_fields = settings["facet_fields"]
+        aggregations = settings["aggregations"]
+        facet = df.groupby(list(facet_fields)).agg(aggregations)
+        facet_outputs[facet_name] = facet
+>>>>>>> dask
 
     # Perform aggregations by classification (e.g. aggregate 4digit products to
     # 2digit and locations to regions, or both, etc)
@@ -159,14 +227,19 @@ def process_dataset(dataset):
     ).items():
 
         # Here is the output dataframe we now want to aggregate up
-        facet = clagg_settings["facet"]
-        base_df = facet_outputs[facet].reset_index()
+        source_name = clagg_settings["source_facet"]
+        facet = dataset["facets"][source_name]["facet_fields"]
+        base_df = facet_outputs[source_name].reset_index()
 
         # First, find out new higher_level ids, e.g. each product_id entry
         # should be replaced from the 4digit id to its 2digit parent etc.
+<<<<<<< HEAD
         for field, agg_level_to in clagg_settings["agg_fields"].items():
             with indented():
                 puts(f"Aggregating to level {agg_level_to}")
+=======
+        for field, agg_level_to in clagg_settings["classification_levels"].items():
+>>>>>>> dask
 
             # Infer classification table and level we're aggregating from, from
             # field name
@@ -195,7 +268,7 @@ def process_dataset(dataset):
 
             # Rename column so that when we join the aggregation table we don't
             # get a duplicate column name accidentally
-            assert "parent_id" not in facet_outputs[facet].columns
+            assert "parent_id" not in facet_outputs[source_name].columns
             aggregation_table.columns = ["parent_id"]
 
             # Convert the new ID field into a categorical type
@@ -211,13 +284,21 @@ def process_dataset(dataset):
             # Drop old field and replace with new aggregation table field
             base_df = (
                 base_df.merge(aggregation_table, left_on=field, right_index=True)
+<<<<<<< HEAD
                 .drop(columns=field)
+=======
+                .drop(field, axis=1)
+>>>>>>> dask
                 .rename(columns={"parent_id": field})
             )
 
         # Now that we have the new parent ids for every field, perform
         # aggregation
+<<<<<<< HEAD
         agg_df = base_df.groupby(facet).agg(clagg_settings["agg_params"])
+=======
+        agg_df = base_df.groupby(list(facet)).agg(clagg_settings["aggregations"])
+>>>>>>> dask
 
         # Add it to the list of classification aggregation results!
         clagg_outputs[clagg_name] = agg_df
