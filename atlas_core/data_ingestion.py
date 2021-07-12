@@ -34,7 +34,7 @@ def merge_ids_from_codes(df, df_merge_on, classification, classification_column)
     return df.merge(code_to_id, left_on=df_merge_on, right_index=True, how="left")
 
 
-def process_dataset(dataset, year_range=(1700, 2200)):
+def process_dataset(dataset, year_range=(1900, 2100)):
 
     puts("=" * 80)
     good("Processing a new dataset!")
@@ -126,31 +126,16 @@ def process_dataset(dataset, year_range=(1700, 2200)):
             pd.CategoricalDtype(categories=classification_table.index.values)
         )
 
-    # if "year" in df.columns:
-    #     df["year"] = df["year"].astype(
-    #         pd.CategoricalDtype(
-    #             categories=df.year.sort_values(ascending=True).unique(), ordered=True
-    #         )
-    #     )
+    if "year" in df.columns:
+        df["year"] = df["year"].astype(
+            pd.CategoricalDtype(categories=range(*year_range), ordered=True)
+        )
 
     # Gather each facet dataset (e.g. DY, PY, DPY variables from DPY dataset)
     facet_outputs = {}
     for facet_fields, aggregations in dataset["facets"].items():
         puts("Working on facet: {}".format(facet_fields))
-
-        facet_groupby = df.groupby(facet_fields)
-
-        # Do specified aggregations / groupings for each column
-        # like mean, first, min, rank, etc
-        agg_outputs = []
-        for agg_field, agg_func in aggregations.items():
-            with indented():
-                puts("Working on: {}".format(agg_field))
-
-            agged_row = agg_func(facet_groupby[[agg_field]])
-            agg_outputs.append(agged_row)
-
-        facet = pd.concat(agg_outputs, axis=1)
+        facet = df.groupby(list(facet_fields)).agg(aggregations).compute()
         facet_outputs[facet_fields] = facet
 
     # Perform aggregations by classification (e.g. aggregate 4digit products to
@@ -161,8 +146,7 @@ def process_dataset(dataset, year_range=(1700, 2200)):
     ).items():
 
         # Here is the output dataframe we now want to aggregate up
-        source_name = clagg_settings["source_facet"]
-        facet = dataset["facets"][source_name]["facet_fields"]
+        source_name = clagg_settings["facet"]
         base_df = facet_outputs[source_name].reset_index()
 
         # First, find out new higher_level ids, e.g. each product_id entry
@@ -220,7 +204,11 @@ def process_dataset(dataset, year_range=(1700, 2200)):
 
         # Now that we have the new parent ids for every field, perform
         # aggregation
-        agg_df = base_df.groupby(list(facet)).agg(clagg_settings["aggregations"])
+        agg_df = (
+            base_df.groupby(list(source_name))
+            .agg(clagg_settings["agg_params"])
+            .compute()
+        )
 
         # Add it to the list of classification aggregation results!
         clagg_outputs[clagg_name] = agg_df
